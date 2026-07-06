@@ -1,0 +1,18 @@
+# 資料與產物一律不進 git(URFD 為 CC BY-NC-SA 4.0,不隨 repo 散布)
+data/
+cache/
+outputs/
+weights/
+*.pt
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+*.egg-info/
+.ipynb_checkpoints/
+
+# 環境
+.env

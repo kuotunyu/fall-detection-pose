@@ -1,0 +1,47 @@
+# fall-detection-pose 全部可調參數
+#
+# 每個閾值附一行選擇理由(面試會被問)。標註「文獻起點」的值來自公開文獻的
+# 常用範圍,最終值將在 URFD tune split(見 eval/splits.yaml)上校準後凍結;
+# test split 的數字不參與任何調參。
+#
+# 長度單位一律是「軀幹長 L̃」(肩中點到髖中點距離的滑動中位數)、
+# 時間單位一律是「秒」——像素閾值不能跨解析度/鏡頭距離遷移,
+# 幀數閾值不能跨 fps 遷移,這是文獻中反覆出現的教訓。
+
+model:
+  name: yolo26n-pose.pt   # n 為預設(速度優先);評估對 n/s 各跑一組
+  conf: 0.25              # YOLO26 是 NMS-free 端到端,分數分布與 YOLO11 不同;從官方預設起跳,僅在 tune split 微調
+  iou: 0.5                # 追蹤關聯用;單人場景不敏感,保持官方預設
+  tracker: bytetrack.yaml # Ultralytics 內建 ByteTrack
+  kpt_conf_min: 0.35      # keypoint 可見門檻。文獻範圍 0.15(Ambianic)~0.5(GMDCSA);取中間:太低吃雜訊,太高在躺姿時大量掉點
+
+rules:
+  smooth_s: 0.15            # 特徵滑動中位數窗 ≈30fps 下 5 幀:壓單幀關鍵點抖動,又不拖慢 ~1s 的跌倒反應
+  velocity_window_s: 0.33   # 垂直速度差分窗:太短放大抖動,太長平掉跌倒峰值;1/3 秒是 ~1s 跌倒歷時中可辨識的片段
+  v_fall_enter: 1.5         # 髖部下降 >1.5 軀幹長/秒 進入 FALLING:跌倒約 3~6 L/s、坐下約 0.5~1 L/s,取中間留 margin
+                            # (棄用 Chen et al. 的 0.009 m/s——單位可疑,像素法亦不可遷移)
+  omega_enter: 90           # 軀幹角速度 >90°/s 亦可進入 FALLING:朝鏡頭跌倒時 v 不明顯,靠軀幹快速翻轉補;彎腰撿東西通常較慢
+  theta_lying_enter: 60     # 躺姿傾角門檻(度)。取 Ambianic 的 60° 而非 Chen 的 45°:45° 會把深彎腰誤判為躺
+  theta_upright_exit: 40    # 回正判定用較低閾值(遲滯):防止特徵在 60° 附近震盪造成狀態抖動與事件碎裂
+  r_lying: 1.0              # bbox 寬/高 > 1 視為橫臥。文獻 1.0(Chen)~1.4(YOLOv8s repo);因僅是 2-of-3 投票之一取寬鬆端;
+                            # 朝鏡頭跌倒時此特徵會失效,靠投票吸收
+  h_hip_lying: 0.5          # 髖踝高差 < 0.5 軀幹長 ≈ 髖部貼地(站立時約 1.5~2.5);以軀幹長正規化,不用像素
+  h_hip_upright_exit: 1.0   # 回正需髖明顯高於踝,與 theta_upright_exit 同為遲滯出口
+  posture_votes_required: 2 # 躺姿證據 [θ, r, h_hip] 三取二:單一幾何特徵各有失效視角
+                            # (GMDCSA 單規則法在 URFD specificity 僅 72.5% 的教訓)
+  window_confirm_s: 0.4     # 躺姿投票滑動窗 ≈12 幀@30fps:文獻從 2 幀(過鬆)到 20-30 幀 buffer(過緊)之間取中
+  vote_ratio: 0.8           # 窗內 80% 幀成立才確認躺姿,容忍 20% 掉點/抖動幀
+  t_falling_timeout_s: 1.2  # FALLING 進入後 1.2s 內未確認躺姿 → 回退 UPRIGHT,不出事件:
+                            # 跌倒全程約 1~3s,快速坐下/蹲下是最常見誤報源,由此攔截
+  t_confirm_fallen_s: 1.0   # 躺姿持續 1s 才升級 ALARM;PIFR 用 5~10s,但 URFD 片段短,1s 是資料集允許的最大去抖
+  t_recover_s: 0.5          # 回正持續 0.5s 才解除,防止掙扎中的短暫坐起打斷事件
+  max_kpt_gap_s: 0.5        # 關鍵點缺失 hold-last 的 TTL:躺地後 keypoint dropout 是 pose 模型已知弱點
+                            # (訓練資料偏直立人形),不能讓 dropout 把一次跌倒切成兩個事件
+  track_lost_timeout_s: 1.0 # track 消失 1s 才終結該 track 的狀態機,給 ByteTrack 重關聯/縫合留時間
+  track_stitch_iou: 0.3     # 新 track 與剛消失舊 track 的末 bbox IoU ≥ 0.3 即縫合(繼承狀態):
+                            # 跌倒瞬間形變大,太嚴會縫不回去
+  track_stitch_window_s: 1.0 # 只在舊 track 消失後 1s 內允許縫合
+
+events:
+  min_event_duration_s: 0.3 # 短於 0.3s 的「事件」必為抖動殘渣,直接濾除
+  merge_gap_s: 1.0          # 同 track 相鄰事件間隔 <1s 合併:防 dropout 把一次跌倒切兩段

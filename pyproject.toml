@@ -1,0 +1,46 @@
+[project]
+name = "fall-detection-pose"
+version = "0.1.0"
+description = "Rule-based fall detection from YOLO26 pose keypoints with ByteTrack multi-object tracking, event-level evaluation on URFD"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "tun", email = "61350295+kuotunyu@users.noreply.github.com" }]
+
+# 核心依賴刻意保持輕量:rules/events/eval 不 import torch/ultralytics/cv2,
+# 使得規則引擎與評估可以在無 GPU 的環境(本機、CI)秒級測試。
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.0",
+    "pyarrow>=15",
+    "pydantic>=2.5",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+# 推論相關(Colab GPU 環境安裝): pip install -e ".[infer]"
+infer = [
+    "ultralytics>=8.4",     # YOLO26-pose 權重自 v8.4.0 起釋出
+    "opencv-python>=4.9",
+    "imageio-ffmpeg>=0.5",  # 保證有 ffmpeg 二進位可做 H.264 重編碼
+    "requests>=2.31",
+]
+demo = ["gradio>=6,<7"]     # Gradio 6.x 語法與 5.x 不相容,鎖主版本
+plot = ["matplotlib>=3.8"]  # 失敗分析特徵時序圖
+all = ["fall-detection-pose[infer,demo,plot]"]
+
+[project.scripts]
+fdp = "fall_detection.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fall_detection"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

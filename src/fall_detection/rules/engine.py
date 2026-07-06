@@ -9,6 +9,9 @@
    逾時凍結;連續無有效觀測超過 ``track_lost_timeout_s`` 即終結該 track。
 4. track 縫合:ByteTrack 在跌倒瞬間常斷 id——新 track 出現時,若與剛消失的
    舊 track 末 bbox 的 IoU 夠高,直接繼承舊狀態機(不魔改 tracker)。
+   舊 track 消失當下若已在 FALLING/FALLEN,縫合與同 id 重現都改用加長版
+   時間窗(``track_stitch_window_falling_s``):此時已有獨立的速度觸發證據,
+   值得多等一下換回真實事件,而非被寫死的一般窗口攔截。
 """
 
 from __future__ import annotations
@@ -22,7 +25,7 @@ from ..config import Config
 from ..events.schema import FallEvent, postprocess_events
 from .features import compute_frame_geometry
 from .smoothing import RollingMedian, TimedBuffer
-from .state_machine import FallStateMachine, TickInput
+from .state_machine import FallStateMachine, State, TickInput
 
 # L̃(軀幹長滑動中位數)的時窗:遠長於單次跌倒(~1s),
 # 朝鏡頭跌倒造成的軀幹投影縮短不會即刻拉低尺度基準。
@@ -63,10 +66,26 @@ class _TrackRunner:
         self.hipy_buf = TimedBuffer(horizon)
         self.theta_buf = TimedBuffer(horizon)
         self.fsm = fsm
+        self.fps = fps
         self.last_t: float | None = None
         self.last_valid_t: float | None = None
         self.last_bbox: tuple | None = None
         self.held: TickInput | None = None
+        self.last_ticked_t: float | None = None
+
+    def _tick(self, t_s: float, tick: TickInput) -> None:
+        """呼叫 fsm.tick 前,先把「這次 tick 距上次 tick 的空窗」橋接掉。
+
+        一般逐幀呼叫時 gap ≈ 一幀時長,橋接量 ≈ 0(無感);只有 tick 之間
+        真的隔了一段沒有任何觀測的空窗(見 ``FallStateMachine.bridge_gap``
+        docstring)才會產生有意義的橋接量。
+        """
+        if self.last_ticked_t is not None:
+            gap = (t_s - self.last_ticked_t) - (1.0 / self.fps)
+            if gap > 1e-9:
+                self.fsm.bridge_gap(gap)
+        self.fsm.tick(tick)
+        self.last_ticked_t = t_s
 
     def step(
         self,
@@ -112,7 +131,7 @@ class _TrackRunner:
             )
             self.held = tick
             self.last_valid_t = t_s
-            self.fsm.tick(tick)
+            self._tick(t_s, tick)
         elif (
             self.held is not None
             and self.last_valid_t is not None
@@ -129,7 +148,7 @@ class _TrackRunner:
                 v_norm=0.0,
                 omega=0.0,
             )
-            self.fsm.tick(tick)
+            self._tick(t_s, tick)
         # else:逾 TTL → 凍結(不 tick);終結與否由引擎依 track_lost_timeout_s 決定
 
         self.last_t = t_s
@@ -162,6 +181,18 @@ class _TrackRunner:
             )
 
 
+def _lost_window_for(ru: _TrackRunner, r, base: float) -> float:
+    """該 runner 消失後可容忍的等待時間。
+
+    一般情況用呼叫端各自的基準值(``base``);若消失當下已在 FALLING/FALLEN,
+    一律換成加長版縫合窗(``track_stitch_window_falling_s``)——見 engine 模組
+    docstring 第 4 點。
+    """
+    if ru.fsm.state in (State.FALLING, State.FALLEN):
+        return r.track_stitch_window_falling_s
+    return base
+
+
 def _pop_stitch_source(
     runners: dict[int, _TrackRunner], bbox: tuple, t_s: float, cfg: Config
 ) -> _TrackRunner | None:
@@ -176,7 +207,7 @@ def _pop_stitch_source(
             continue
         if ru.last_t >= t_s - 1e-9:  # 本幀已更新:仍活著
             continue
-        if t_s - ru.last_t > r.track_stitch_window_s:
+        if t_s - ru.last_t > _lost_window_for(ru, r, r.track_stitch_window_s):
             continue
         iou = _iou(ru.last_bbox, bbox)
         if iou >= r.track_stitch_iou and iou > best_iou:
@@ -223,11 +254,11 @@ def run_engine(
             tid = int(row.track_id)
             t_s = float(row.t_ms) / 1000.0
             runner = runners[tid]
-            if (
-                runner.last_valid_t is not None
-                and (t_s - runner.last_valid_t) > r.track_lost_timeout_s
-            ):
+            if runner.last_valid_t is not None and (
+                t_s - runner.last_valid_t
+            ) > _lost_window_for(runner, r, r.track_lost_timeout_s):
                 # 同一 id 長時間無有效觀測後重現:舊片段終結,重新起算
+                # (FALLING/FALLEN 時用加長版時間窗,理由同縫合)
                 events_raw.extend(runner.fsm.finalize())
                 runner = _TrackRunner(cfg, fps, FallStateMachine(r, tid))
                 runners[tid] = runner
@@ -246,14 +277,23 @@ def run_engine(
                 runner.torso_med = src.torso_med
                 runner.held = src.held
                 runner.last_valid_t = src.last_valid_t
+                # 也繼承上次 tick 時刻,讓縫合斷點的空窗被 _tick 正確橋接
+                # (否則消失期間的時間差會被誤算成「觀察了這麼久還沒確認」)
+                runner.last_ticked_t = src.last_ticked_t
             else:
                 runner = _TrackRunner(cfg, fps, FallStateMachine(r, tid))
             runners[tid] = runner
             runner.step(cfg, tid, int(row.frame_idx), t_s, bbox, row.kpts_xy, row.kpts_conf, debug)
 
-        # 清掃:超過縫合窗且超過 lost timeout 的 runner 一律終結
-        stale_cut = t_frame - max(r.track_lost_timeout_s, r.track_stitch_window_s)
-        for tid in [t for t, ru in runners.items() if ru.last_t is not None and ru.last_t < stale_cut]:
+        # 清掃:超過各自可容忍等待時間的 runner 終結。FALLING/FALLEN 用加長版窗,
+        # 否則會在縫合視窗生效前就被這裡提前終結(見 _lost_window_for)。
+        base = max(r.track_lost_timeout_s, r.track_stitch_window_s)
+        stale = [
+            tid
+            for tid, ru in runners.items()
+            if ru.last_t is not None and ru.last_t < t_frame - _lost_window_for(ru, r, base)
+        ]
+        for tid in stale:
             events_raw.extend(runners.pop(tid).fsm.finalize())
 
     for runner in runners.values():

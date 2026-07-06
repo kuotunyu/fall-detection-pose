@@ -131,6 +131,62 @@ def test_no_stitch_after_window_expires(cfg):
     assert events[0].track_ids == [1]
 
 
+def test_stitch_across_extended_window_while_falling(cfg):
+    """舊 track 消失時已在 FALLING:縫合改用加長版時間窗(track_stitch_window_falling_s)。
+
+    重現 URFD fall-01 煙測實測到的斷 track 型態:track 在觸發 FALLING 後
+    (躺姿尚未投票確認)整個消失,新 track 於一般縫合窗(1.0s)之後、
+    加長版窗(2.0s)之內帶著明確躺姿特徵重新出現。
+    """
+    faller = make_trajectory([("stand", 2.0), ("to:lie", 0.6)], fps=FPS, track_id=1)
+    # 舊 track 於 t=2.6 結束(仍在 FALLING);新 track 6 於 t=4.1 出現,
+    # 間隔 1.5s:> 1.0s 一般窗,但 < 2.0s 加長窗
+    reappear = make_trajectory([("lie", 2.0)], fps=FPS, track_id=6)
+    reappear["frame_idx"] = reappear["frame_idx"] + 123
+    reappear["t_ms"] = reappear["t_ms"] + 4100.0
+    df = pd.concat([faller, reappear], ignore_index=True).reset_index(drop=True)
+    events, _ = run_engine(df, FPS, cfg)
+    assert len(events) == 1
+    assert events[0].track_ids == [1, 6]
+    assert "lying_persisted" in events[0].rules_fired  # 真的撐到 ALARM,不只是 FALLEN 收尾
+
+
+def test_no_extended_stitch_when_last_state_upright(cfg):
+    """負向對照:舊 track 消失時是 UPRIGHT(從未被速度觸發過,即使外觀已是躺姿)。
+
+    證明加長版時間窗只認 FSM 狀態,不是把一般縫合窗整個放寬到 2s
+    ——同樣的間隔、同樣的躺姿外觀,只因舊 state 不是 FALLING/FALLEN 就不縫合。
+    """
+    old = make_trajectory([("lie", 2.6)], fps=FPS, track_id=1)  # 全程恆定躺姿:無位移→無速度觸發,state 全程 UPRIGHT
+    reappear = make_trajectory([("lie", 2.0)], fps=FPS, track_id=6)
+    reappear["frame_idx"] = reappear["frame_idx"] + 123
+    reappear["t_ms"] = reappear["t_ms"] + 4100.0
+    df = pd.concat([old, reappear], ignore_index=True).reset_index(drop=True)
+    events, _ = run_engine(df, FPS, cfg)
+    assert events == []  # 兩段都困在 UPRIGHT(無速度觸發),縫合與否都不觸發
+
+
+def test_stitch_then_track_lost_before_alarm_still_one_event(cfg):
+    """端到端重現 fall-01 完整型態:兩個修正缺一都不會過。
+
+    FALLING 時斷 track → 縫合(加長窗)接回 → 躺姿投票確認 FALLEN →
+    track 就此徹底消失,撐不到 t_confirm_fallen_s 的 ALARM。
+    仍應收尾成一個事件(finalize-while-FALLEN),且 track_ids 橫跨兩個 id
+    (加長版縫合窗)。
+    """
+    faller = make_trajectory([("stand", 2.0), ("to:lie", 0.6)], fps=FPS, track_id=1)
+    # 新 track 只給 0.4s 躺姿:足夠讓躺姿投票確認 FALLEN,但撐不到 ALARM(1.0s)
+    reappear = make_trajectory([("lie", 0.4)], fps=FPS, track_id=6)
+    reappear["frame_idx"] = reappear["frame_idx"] + 123
+    reappear["t_ms"] = reappear["t_ms"] + 4100.0
+    df = pd.concat([faller, reappear], ignore_index=True).reset_index(drop=True)
+    events, _ = run_engine(df, FPS, cfg)
+    assert len(events) == 1
+    assert events[0].track_ids == [1, 6]
+    assert "track_lost_while_fallen" in events[0].rules_fired
+    assert "lying_persisted" not in events[0].rules_fired  # 沒撐到 ALARM,不該有這個 tag
+
+
 def test_scale_invariance_exact(cfg):
     df = make_trajectory([("stand", 2.0), ("to:lie", 0.6), ("lie", 3.0)], fps=FPS, noise=0.5)
     ev_a, _ = run_engine(df, FPS, cfg)

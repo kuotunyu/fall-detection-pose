@@ -50,6 +50,63 @@ def test_track_end_closes_open_alarm(cfg):
     assert len(events) == 1  # 影片在 ALARM 中結束:事件以最後一幀收尾
 
 
+def test_finalize_while_fallen_still_closes_event(cfg):
+    """FALLEN(躺姿已投票確認)但尚未撐滿 t_confirm_fallen_s 就整個 track 消失:
+    仍應收尾為一次事件,而非靜默丟棄(躺地後 pose 模型偵測斷訊是已知風險,
+    寧可觸發不可漏判)。"""
+    rules = cfg.rules.model_copy(update={"t_confirm_fallen_s": 5.0})
+    fsm = FallStateMachine(rules, track_id=1)
+    t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
+    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
+    t, f = _feed(fsm, t + DT, 0.6, f + 1, **LYING_KW)
+    assert fsm.state is State.FALLEN
+    events = fsm.finalize()
+    assert len(events) == 1
+    assert "track_lost_while_fallen" in events[0].rules_fired
+    assert "posture_vote_confirmed" in events[0].rules_fired
+    assert "lying_persisted" not in events[0].rules_fired  # 沒撐到 ALARM,不該有這個 tag
+
+
+def test_bridge_gap_prevents_false_falling_timeout(cfg):
+    """縫合空窗若不橋接,消失期間的時間差會被誤算成「觀察了這麼久還沒確認」,
+    導致 falling-timeout 誤回退——這正是 URFD fall-01 煙測踩到的真實案例
+    (track 在觸發 FALLING 後消失超過 1s,縫合回來時真實經過時間已超過
+    t_falling_timeout_s)。"""
+    fsm = FallStateMachine(cfg.rules, track_id=1)
+    t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
+    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
+    assert fsm.state is State.FALLING
+    falling_since_before = fsm._falling_since
+    # 消失空窗:真實經過時間 > t_falling_timeout_s,不橋接就會誤觸發回退
+    gap = cfg.rules.t_falling_timeout_s + 0.5
+    fsm.adopt(9)
+    fsm.bridge_gap(gap)
+    assert fsm._falling_since == falling_since_before + gap
+    t2 = t + DT + gap
+    fsm.tick(TickInput(t_s=t2, frame_idx=f + 1, theta_deg=85.0, bbox_aspect=2.5, h_hip=0.1, v_norm=0.2, omega=0.0))
+    assert fsm.state is State.FALLING  # 沒被誤回退成 UPRIGHT
+    assert fsm.track_ids == [1, 9]
+
+
+def test_bridge_gap_does_not_pollute_vote_window_with_stale_samples(cfg):
+    """bridge_gap 位移 _falling_since 等單一時間戳,但刻意不位移 _vote_win:
+    否則空窗前的舊「未躺」樣本會被誤認成剛觀察到,拖累縫合後的躺姿投票比例,
+    延誤本該在 window_confirm_s 內就能確認的 FALLEN 判定。"""
+    fsm = FallStateMachine(cfg.rules, track_id=1)
+    t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
+    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
+    # 短暫停留 FALLING,累積幾幀「尚未躺平」的 False 投票樣本
+    t, f = _feed(fsm, t + DT, 0.3, f + 1, theta_deg=40.0, bbox_aspect=0.7, h_hip=1.0, v_norm=2.0, omega=0.0)
+    assert fsm.state is State.FALLING
+    fsm.adopt(9)
+    fsm.bridge_gap(1.5)
+    t2 = t + 1.5
+    # 縫合後立刻是清楚的躺姿,只餵 window_confirm_s 多一點:若舊樣本沒被正確
+    # 排除,比例會被拖低而確認不了
+    t2, f = _feed(fsm, t2, cfg.rules.window_confirm_s + 0.2, f, **LYING_KW)
+    assert fsm.state is State.FALLEN
+
+
 def test_falling_timeout_rejects_fast_sit(cfg):
     fsm = FallStateMachine(cfg.rules, track_id=1)
     t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)

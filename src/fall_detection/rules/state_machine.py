@@ -8,6 +8,9 @@
     FALLEN  ─(躺姿連續 t_confirm_fallen_s)→ ALARM(此刻才「確認」一次跌倒)
     FALLEN/ALARM ─(回正持續 t_recover_s;遲滯出口閾值)→ UPRIGHT
                   (ALARM 時關閉事件;FALLEN 未達確認,不出事件)
+    FALLEN ─(track 消失/finalize,未撐到 ALARM)→ 仍收尾為一次事件:
+             躺姿已通過投票確認,消失後多半是持續倒地不起
+             (pose 模型對躺姿本身較弱,常見整段掉偵測),寧可觸發不可漏判
 
 事件的起點是「進入 FALLING 的幀」(跌倒開始),而非 ALARM 的幀——
 告警需要去抖動延遲,但事件時間軸要對齊真實跌倒,評估才公平。
@@ -83,6 +86,31 @@ class FallStateMachine:
         if tid not in self.track_ids:
             self.track_ids.append(tid)
 
+    def bridge_gap(self, gap_s: float) -> None:
+        """跨越一段完全沒有 tick 的空窗(track 消失後縫合重連、或同一 id 在
+        hold-last TTL 用盡後才恢復偵測):把空窗時長從「已經過多久」的單一時間戳
+        判斷基準(_falling_since 等)往後平移,不計入去抖動時長。
+
+        ``t_falling_timeout_s``/``t_confirm_fallen_s``/``t_recover_s`` 都是靠單一
+        時間戳算「已經過多久」,假設連續觀察;空窗期間根本沒有任何觀測,不該被
+        當成「觀察了這麼久仍未確認」而誤觸發回退——那樣縫合視窗放得越寬,反而
+        越容易被這裡打回原形。
+
+        ``_vote_win`` 刻意不做位移:它是離散樣本的滑動窗,不是單一時間戳;
+        位移只會讓空窗前的舊樣本看起來「剛剛才觀察到」,污染縫合後的投票比例。
+        舊樣本本來就會被下一次 ``_push_vote`` 依真實時間差自然淘汰,不需要特殊處理。
+        """
+        if gap_s <= 0:
+            return
+        if self._falling_since is not None:
+            self._falling_since += gap_s
+        if self._lying_since is not None:
+            self._lying_since += gap_s
+        if self._not_lying_since is not None:
+            self._not_lying_since += gap_s
+        if self._recover_since is not None:
+            self._recover_since += gap_s
+
     def tick(self, x: TickInput) -> None:
         cfg = self.cfg
         self._last_t, self._last_frame = x.t_s, x.frame_idx
@@ -152,8 +180,15 @@ class FallStateMachine:
                 self._rollback()
 
     def finalize(self) -> list[FallEvent]:
-        """track 結束(消失逾時或影片結尾):關閉進行中的 ALARM 事件並回傳全部事件。"""
+        """track 結束(消失逾時或影片結尾):關閉進行中的事件並回傳全部事件。
+
+        ALARM 中結束自然收尾;FALLEN 中結束(躺姿已投票確認,但尚未撐滿
+        t_confirm_fallen_s)也視為一次事件收尾——見上方 FSM 圖說明。
+        """
         if self._alarm_open and self._last_frame is not None:
+            self._close_event(self._last_frame, self._last_t)
+        elif self.state is State.FALLEN and self._last_frame is not None:
+            self._ctx.rules_fired.add("track_lost_while_fallen")
             self._close_event(self._last_frame, self._last_t)
         self._ctx = None
         self._alarm_open = False

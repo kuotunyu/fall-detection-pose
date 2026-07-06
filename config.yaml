@@ -40,7 +40,11 @@ rules:
   track_lost_timeout_s: 1.0 # track 消失 1s 才終結該 track 的狀態機,給 ByteTrack 重關聯/縫合留時間
   track_stitch_iou: 0.3     # 新 track 與剛消失舊 track 的末 bbox IoU ≥ 0.3 即縫合(繼承狀態):
                             # 跌倒瞬間形變大,太嚴會縫不回去
-  track_stitch_window_s: 1.0 # 只在舊 track 消失後 1s 內允許縫合
+  track_stitch_window_s: 1.0 # 一般情況只在舊 track 消失後 1s 內允許縫合
+  track_stitch_window_falling_s: 2.0 # 舊 track 消失時已在 FALLING/FALLEN 才適用的加長版窗:
+                              # 跌倒瞬間姿態劇變、加上 pose 模型對躺姿本身較弱,常整段掉偵測;
+                              # 此時已有速度觸發的獨立證據,巧合撞上另一人的機率極低,值得多等
+                              # 换回真實事件(真實案例:URFD fall-01 斷 1.33s,1.0s 窗接不回去)
 
 events:
   min_event_duration_s: 0.3 # 短於 0.3s 的「事件」必為抖動殘渣,直接濾除

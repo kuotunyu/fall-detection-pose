@@ -45,6 +45,7 @@ class RulesConfig(BaseModel):
     track_lost_timeout_s: float = Field(gt=0.0)
     track_stitch_iou: float = Field(gt=0.0, lt=1.0)
     track_stitch_window_s: float = Field(gt=0.0)
+    track_stitch_window_falling_s: float = Field(gt=0.0)
 
     @model_validator(mode="after")
     def _check_consistency(self) -> "RulesConfig":
@@ -59,6 +60,11 @@ class RulesConfig(BaseModel):
         if self.max_kpt_gap_s > self.track_lost_timeout_s:
             raise ValueError(
                 "max_kpt_gap_s 不可大於 track_lost_timeout_s(hold-last 不能比 track 終結還久)"
+            )
+        if self.track_stitch_window_falling_s < self.track_stitch_window_s:
+            raise ValueError(
+                "track_stitch_window_falling_s 不可小於 track_stitch_window_s"
+                "(前者是後者在 FALLING/FALLEN 時的放寬版本)"
             )
         return self
 

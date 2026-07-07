@@ -19,8 +19,8 @@
 | M0 | 專案骨架 | ✅ |
 | M1 | 規則引擎 + 合成軌跡單元測試 | ✅ |
 | M2 | 推論 pipeline + 煙測 notebook | ✅ |
-| M3 | URFD 全量抽取 | 🔄 |
-| M4 | 閾值校準 + 評估 + 失敗分析 | ⬜ |
+| M3 | URFD 全量抽取 | ✅ |
+| M4 | 閾值校準 + 評估 + 失敗分析 | 🔄 |
 | M5 | FPS benchmark | ⬜ |
 | M6 | Gradio demo | ⬜ |
 | M7 | README 定稿 | ⬜ |

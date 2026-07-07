@@ -56,35 +56,47 @@ python -m fall_detection.app.gradio_app --no-share    # 本機跑 demo(不建立
 
 ## 架構
 
+**主流程**——只有 `extract`(GPU 姿態推論)是重的一步,其餘全部吃 cache 好的
+keypoint parquet、CPU 秒級跑完,這是整個專案「推論與規則解耦」的核心設計。
+`app/gradio_app.py`(Gradio demo)不是額外的一條路徑,就是直接依序呼叫
+`extract` → `engine` → `annotate` 這三個函式,沒有另外的邏輯。
+
 ```mermaid
-flowchart LR
-    V[影片] --> EX["inference/extract.py<br/>YOLO26-pose + ByteTrack"]
+flowchart TD
+    V[影片] --> EX
+
+    subgraph gpu["GPU(唯一需要 GPU 的步驟)"]
+        EX["inference/extract.py<br/>YOLO26-pose + ByteTrack"]
+    end
+
     EX --> CACHE[("keypoint cache<br/>parquet + meta.json")]
 
-    CACHE --> ENGINE["rules/engine.py<br/>特徵管線 + 每-track 狀態機"]
-    CFG["config.yaml<br/>(全部閾值)"] -.-> ENGINE
-    ENGINE --> EVENTS["events.json"]
-    ENGINE --> DEBUG["debug JSONL<br/>(--debug)"]
+    subgraph cpu["CPU(秒級,無需 GPU)"]
+        CACHE --> ENGINE["rules/engine.py<br/>特徵管線 + 每-track 狀態機"]
+        CFG["config.yaml<br/>全部閾值"] -.-> ENGINE
+        ENGINE --> EVENTS["events.json"]
+        ENGINE --> DEBUG["debug JSONL<br/>(--debug)"]
+        CACHE --> ANNOTATE["viz/annotate.py<br/>骨架 + 狀態 + ALARM 疊加"]
+        EVENTS --> ANNOTATE
+        DEBUG --> ANNOTATE
+    end
 
-    CACHE --> ANNOTATE["viz/annotate.py<br/>骨架 + 狀態 + ALARM 疊加"]
-    EVENTS --> ANNOTATE
-    DEBUG --> ANNOTATE
-    ANNOTATE --> OUT["標註影片(H.264)"]
-
-    CACHE --> REPORT["eval/report.py<br/>grid-search + matching"]
-    EVENTS --> REPORT
-    GT["urfall-cam0-*.csv"] --> REPORT
-    REPORT --> METRICS["eval/metrics.json"]
+    ANNOTATE --> OUT["標註影片<br/>(H.264)"]
 
     style EX fill:#f9d5a7
     style CACHE fill:#f5f5f5
     style ENGINE fill:#a7d5f9
 ```
 
-只有 `extract`(GPU 姿態推論)是重的一步;其餘全部吃 cache 好的 keypoint parquet,
-CPU 秒級跑完,這是整個專案「推論與規則解耦」的核心設計。`app/gradio_app.py`
-(Gradio demo)不是額外的一條路徑,就是直接依序呼叫 `extract` → `engine` →
-`annotate` 這三個函式,沒有另外的邏輯。
+**評估流程**(調參/校準用,同樣不需要重跑 GPU——直接吃已經抽好的 cache):
+
+```mermaid
+flowchart TD
+    CACHE[("keypoint cache")] --> REPORT["eval/report.py<br/>grid-search + matching"]
+    EVENTS["events.json"] --> REPORT
+    GT["urfall-cam0-*.csv<br/>(ground truth)"] --> REPORT
+    REPORT --> METRICS["eval/metrics.json"]
+```
 
 ## 判斷邏輯
 

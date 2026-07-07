@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import subprocess
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -49,8 +50,14 @@ def extract_video(
     device: str | None = None,
     tracker: PoseTracker | None = None,
     progress_every: int = 300,
+    on_frame: Callable[[int, int], None] | None = None,
 ) -> CacheMeta:
-    """單支影片 → cache parquet。可傳入共用 tracker(批次時避免重複載模型)。"""
+    """單支影片 → cache parquet。可傳入共用 tracker(批次時避免重複載模型)。
+
+    ``on_frame(frame_idx, total_frames)`` 選填,每幀呼叫一次,供呼叫端
+    (如 Gradio demo 的 ``gr.Progress``)回報逐幀進度;不影響既有的
+    ``progress_every`` 主控台列印。
+    """
     video_path = Path(video_path)
     info = probe(video_path)
 
@@ -85,6 +92,8 @@ def extract_video(
                     "kpts_conf": det.kpts_conf[i],
                 }
             )
+        if on_frame is not None:
+            on_frame(frame_idx, info.n_frames)
         if progress_every and frame_idx % progress_every == 0 and frame_idx > 0:
             print(f"  {video_path.name}: {frame_idx} 幀…")
 

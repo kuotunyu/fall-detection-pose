@@ -44,6 +44,48 @@ def _empty(frame_idx: int) -> FrameDetections:
     )
 
 
+def convert_results(frame_idx: int, results) -> FrameDetections:
+    """單幀的 ``model.track()`` 原始回傳(torch tensors)→ 純 numpy FrameDetections。
+
+    獨立成函式(而非 PoseTracker 的方法)供 ``bench.benchmark`` 復用:量測
+    「純推論」與「端到端」延遲時,兩者都只呼叫一次 ``model.track()``,轉換
+    這步驟另外計時,而不是把轉換邏輯複製一份。
+    """
+    r = results[0]
+    boxes = r.boxes
+    if boxes is None or len(boxes) == 0:
+        return _empty(frame_idx)
+    n = len(boxes)
+
+    ids = boxes.id
+    track_ids = (
+        ids.int().cpu().numpy().astype(np.int32)
+        if ids is not None
+        else np.full((n,), -1, dtype=np.int32)
+    )
+
+    kpts = r.keypoints
+    if kpts is None or kpts.xy is None:
+        kxy = np.zeros((n, N_KPTS, 2), dtype=np.float32)
+        kconf = np.full((n, N_KPTS), -1.0, dtype=np.float32)
+    else:
+        kxy = kpts.xy.cpu().numpy().astype(np.float32)
+        kconf = (
+            kpts.conf.cpu().numpy().astype(np.float32)
+            if kpts.conf is not None
+            else np.full((n, N_KPTS), -1.0, dtype=np.float32)
+        )
+
+    return FrameDetections(
+        frame_idx=frame_idx,
+        boxes=boxes.xyxy.cpu().numpy().astype(np.float32),
+        box_conf=boxes.conf.cpu().numpy().astype(np.float32),
+        track_ids=track_ids,
+        kpts_xy=kxy,
+        kpts_conf=kconf,
+    )
+
+
 class PoseTracker:
     def __init__(
         self,
@@ -62,10 +104,11 @@ class PoseTracker:
         self.iou = iou
         self.device = device
 
-    def track_frame(self, frame_bgr: np.ndarray, frame_idx: int) -> FrameDetections:
-        """對單一幀執行 pose 推論 + 追蹤;回傳純 numpy 結果。"""
-        results = self.model.track(
-            frame_bgr,
+    def track_kwargs(self) -> dict:
+        """組出 ``model.track()`` 的關鍵字參數(benchmark 需要直接呼叫底層
+        ``model.track()`` 以量測純推論延遲,不能只靠 :meth:`track_frame`,
+        避免同一幀被 ``persist=True`` 的 tracker 吃兩次而弄亂 track 狀態)。"""
+        return dict(
             persist=True,
             tracker=self.tracker_yaml,
             conf=self.conf,
@@ -73,39 +116,11 @@ class PoseTracker:
             device=self.device,
             verbose=False,
         )
-        r = results[0]
-        boxes = r.boxes
-        if boxes is None or len(boxes) == 0:
-            return _empty(frame_idx)
-        n = len(boxes)
 
-        ids = boxes.id
-        track_ids = (
-            ids.int().cpu().numpy().astype(np.int32)
-            if ids is not None
-            else np.full((n,), -1, dtype=np.int32)
-        )
-
-        kpts = r.keypoints
-        if kpts is None or kpts.xy is None:
-            kxy = np.zeros((n, N_KPTS, 2), dtype=np.float32)
-            kconf = np.full((n, N_KPTS), -1.0, dtype=np.float32)
-        else:
-            kxy = kpts.xy.cpu().numpy().astype(np.float32)
-            kconf = (
-                kpts.conf.cpu().numpy().astype(np.float32)
-                if kpts.conf is not None
-                else np.full((n, N_KPTS), -1.0, dtype=np.float32)
-            )
-
-        return FrameDetections(
-            frame_idx=frame_idx,
-            boxes=boxes.xyxy.cpu().numpy().astype(np.float32),
-            box_conf=boxes.conf.cpu().numpy().astype(np.float32),
-            track_ids=track_ids,
-            kpts_xy=kxy,
-            kpts_conf=kconf,
-        )
+    def track_frame(self, frame_bgr: np.ndarray, frame_idx: int) -> FrameDetections:
+        """對單一幀執行 pose 推論 + 追蹤;回傳純 numpy 結果。"""
+        results = self.model.track(frame_bgr, **self.track_kwargs())
+        return convert_results(frame_idx, results)
 
     def reset(self) -> None:
         """清空 tracker 狀態(換影片前呼叫,避免 track id 跨影片延續)。"""

@@ -5,6 +5,7 @@
   detect    cache → events.json(純 CPU,毫秒級;--debug 另輸出特徵 JSONL)
   annotate  影片 + cache → 標註影片(H.264)+ events.json
   pipeline  extract → detect → annotate 一條龍(--source 0 可用 webcam 錄一段再處理)
+  bench     影片 → FPS benchmark(可攜:任何機器都能補跑一列,不綁 Colab)
 
 重依賴(torch/ultralytics/cv2)一律延遲到子命令內 import:
 ``fdp detect`` 在只裝核心依賴的環境(無 GPU)也能跑。
@@ -157,6 +158,53 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bench(args: argparse.Namespace) -> int:
+    """影片 → FPS benchmark(純推論 + 端到端 FPS、p50/p95 延遲)。
+
+    可攜:任何機器都能對同一支(或任一支)影片補跑一列,不綁定 Colab——
+    --model 可重複指定多次,一次跑完整個模型清單。
+    """
+    import platform
+
+    from .bench.benchmark import benchmark, load_frames
+
+    frames = load_frames(args.video, n_frames=args.n_frames)
+    print(f"{args.video}: 載入 {len(frames)} 幀(要求 {args.n_frames})")
+
+    results = []
+    for model_name in args.model:
+        r = benchmark(
+            frames,
+            model_name=model_name,
+            device=args.device,
+            quantize=args.quantize,
+            n_runs=args.n_runs,
+            warmup=args.warmup,
+        )
+        results.append(r.to_dict())
+        print(
+            f"  {model_name}: 純推論 {r.pure_inference_fps} FPS、端到端 {r.end_to_end_fps} FPS、"
+            f"p50 {r.p50_latency_ms}ms、p95 {r.p95_latency_ms}ms"
+        )
+
+    if args.out:
+        import torch
+        import ultralytics
+
+        payload = {
+            "video": str(args.video),
+            "platform": platform.platform(),
+            "torch_version": torch.__version__,
+            "ultralytics_version": ultralytics.__version__,
+            "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+            "results": results,
+        }
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"→ {args.out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fdp", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -193,6 +241,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--duration", type=float, default=10.0, help="webcam 錄製秒數")
     p.add_argument("--debug", action="store_true", help="輸出 per-frame 特徵 JSONL")
     p.set_defaults(func=cmd_pipeline)
+
+    p = sub.add_parser("bench", help="影片 → FPS benchmark(可攜,任何機器都能補跑)")
+    p.add_argument("--video", required=True, help="固定用來計時的影片")
+    p.add_argument("--model", action="append", required=True, help="模型名,可重複指定多次")
+    p.add_argument("--device", default=None, help="cuda:0 / cpu(預設由 ultralytics 自選)")
+    p.add_argument("--quantize", default=None, help="16 或 fp16 啟用 FP16 推論(僅 GPU 有意義)")
+    p.add_argument("--n-frames", type=int, default=300, dest="n_frames")
+    p.add_argument("--n-runs", type=int, default=3, dest="n_runs")
+    p.add_argument("--warmup", type=int, default=20)
+    p.add_argument("--out", default=None, help="bench.json 輸出路徑(可選)")
+    p.set_defaults(func=cmd_bench)
 
     return parser
 

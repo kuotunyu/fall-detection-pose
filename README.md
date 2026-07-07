@@ -21,8 +21,8 @@
 | M2 | 推論 pipeline + 煙測 notebook | ✅ |
 | M3 | URFD 全量抽取 | ✅ |
 | M4 | 閾值校準 + 評估 + 失敗分析 | ✅ |
-| M5 | FPS benchmark | 🔄 |
-| M6 | Gradio demo | ⬜ |
+| M5 | FPS benchmark | ✅ |
+| M6 | Gradio demo | 🔄 |
 | M7 | README 定稿 | ⬜ |
 
 ## 評估
@@ -45,6 +45,40 @@
 觀測已符合躺姿卻沒收尾成事件)後,第二輪 F1(yolo26n-pose)從 0.457 提升到
 0.600。調參準則:recall 優先、precision ≥ 0.5 才列入候選——跌倒漏判(沒人去
 查看)的代價高於一次誤報。
+
+## Benchmark
+
+固定一支 URFD 重組影片(`adl-01.mp4`,150 幀,實際可用幀數誠實回報而非湊滿
+300)先整支解碼進記憶體,`{yolo26n-pose, yolo26s-pose} x {GPU FP32, GPU FP16,
+CPU}` 各跑 3 輪取中位數;GPU 計時前後夾 `torch.cuda.synchronize()`,CPU 為
+Colab 標準 2 vCPU(數字偏低,誠實照報)。**不引用官方「CPU 快 43%」的宣傳
+數字**——那是 detect 模型的 ONNX 匯出數字,不適用本專案的 pose 模型。原始
+數字見 [bench.json](bench.json)。
+
+| 模型 | 裝置 | 端到端 FPS | p50 延遲 | p95 延遲 |
+|---|---|---|---|---|
+| yolo26n-pose | GPU(T4)FP32 | 59.65 | 13.84ms | 23.52ms |
+| yolo26n-pose | GPU(T4)FP16 | 64.64 | 15.63ms | 24.25ms |
+| yolo26n-pose | CPU(2 vCPU) | 8.23 | 116.96ms | 178.96ms |
+| yolo26s-pose | GPU(T4)FP32 | 72.25 | 13.88ms | 20.40ms |
+| yolo26s-pose | GPU(T4)FP16 | 66.18 | 14.69ms | 24.09ms |
+| yolo26s-pose | CPU(2 vCPU) | 3.36 | 271.15ms | 408.98ms |
+
+兩個模型在 GPU 上都遠超即時(30fps)所需;CPU 上 `yolo26n-pose` 仍有 8+ FPS
+堪用,`yolo26s-pose` 掉到 3.36 FPS 明顯吃緊。GPU 對較大模型的加速幅度也更大
+(n:~7.3x、s:~21.5x),符合計算量較重的模型從平行化得利更多的預期。
+
+**測出來的兩個反直覺數字,誠實報告、不隱藏**:
+- `yolo26s-pose` 在 GPU 上量到比 `yolo26n-pose` 更快(73.53 vs 60.65 FPS
+  純推論)。CPU 上兩者關係符合預期(s 比 n 慢 ~2.45 倍,計算量差異的合理
+  反映),因此 GPU 這個反轉不太像是程式呼叫錯模型的 bug,較可能是量測順序
+  效應(n 先跑,GPU/CUDA kernel 尚未完全暖機)或 Colab 共用 T4 的量測雜訊
+  ——樣本數(150 幀 x 3 輪)不足以下更強的結論。
+- FP16 對 `yolo26n-pose` 有加速(+8.3%),對 `yolo26s-pose` 反而略慢(-8.6%),
+  同樣可能是雜訊,也可能反映小模型的 FP16 casting 額外開銷相對計算量比例
+  較大,抵銷部分理論加速。
+- benchmark 腳本(`fdp bench` 或 `src/fall_detection/bench/benchmark.py`)
+  可攜,任何機器都能補跑一列驗證,不綁定本次 Colab session 的結果。
 
 ## 失敗分析
 

@@ -1,0 +1,81 @@
+{
+  "video": "adl-01.mp4 (URFD, reconstructed 640x480 @30fps)",
+  "n_frames_requested": 300,
+  "n_frames_used": 150,
+  "note": "adl-01 only has 150 frames (5s); load_frames() honestly reports actual usage rather than padding to the requested count.",
+  "python": "3.12.13",
+  "torch": "2.11.0+cu128",
+  "ultralytics": "8.4.90",
+  "gpu": "Tesla T4",
+  "cpu": "x86_64",
+  "cpu_count": 2,
+  "git_commit": "38667a0",
+  "results": [
+    {
+      "model_name": "yolo26n-pose.pt",
+      "device": "cuda:0",
+      "quantize": null,
+      "n_frames": 150,
+      "n_runs": 3,
+      "pure_inference_fps": 60.65,
+      "end_to_end_fps": 59.65,
+      "p50_latency_ms": 13.84,
+      "p95_latency_ms": 23.52
+    },
+    {
+      "model_name": "yolo26n-pose.pt",
+      "device": "cuda:0",
+      "quantize": "16",
+      "n_frames": 150,
+      "n_runs": 3,
+      "pure_inference_fps": 65.7,
+      "end_to_end_fps": 64.64,
+      "p50_latency_ms": 15.63,
+      "p95_latency_ms": 24.25
+    },
+    {
+      "model_name": "yolo26n-pose.pt",
+      "device": "cpu",
+      "quantize": null,
+      "n_frames": 150,
+      "n_runs": 3,
+      "pure_inference_fps": 8.24,
+      "end_to_end_fps": 8.23,
+      "p50_latency_ms": 116.96,
+      "p95_latency_ms": 178.96
+    },
+    {
+      "model_name": "yolo26s-pose.pt",
+      "device": "cuda:0",
+      "quantize": null,
+      "n_frames": 150,
+      "n_runs": 3,
+      "pure_inference_fps": 73.53,
+      "end_to_end_fps": 72.25,
+      "p50_latency_ms": 13.88,
+      "p95_latency_ms": 20.4
+    },
+    {
+      "model_name": "yolo26s-pose.pt",
+      "device": "cuda:0",
+      "quantize": "16",
+      "n_frames": 150,
+      "n_runs": 3,
+      "pure_inference_fps": 67.23,
+      "end_to_end_fps": 66.18,
+      "p50_latency_ms": 14.69,
+      "p95_latency_ms": 24.09
+    },
+    {
+      "model_name": "yolo26s-pose.pt",
+      "device": "cpu",
+      "quantize": null,
+      "n_frames": 150,
+      "n_runs": 3,
+      "pure_inference_fps": 3.36,
+      "end_to_end_fps": 3.36,
+      "p50_latency_ms": 271.15,
+      "p95_latency_ms": 408.98
+    }
+  ]
+}

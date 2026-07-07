@@ -1,6 +1,6 @@
 # fall-detection-pose
 
-> 🚧 v1 開發中 — 依 [plan.md](plan.md) 實作,README 完整版(架構圖、評估表、失敗分析)於 M7 里程碑定稿。
+> 🚧 v1 開發中 — 依 [plan.md](plan.md) 實作,僅架構圖與最終潤稿待 M7 里程碑定稿。
 
 以 **YOLO26-pose 預訓練模型 + ByteTrack 多目標追蹤**為基礎的規則式(rule-based)跌倒偵測系統。
 本專案重點不在模型創新,而在工程能力:
@@ -12,6 +12,24 @@
 - **失敗分析**:對誤報與漏報案例附特徵時序圖,展示規則「為什麼」觸發或錯過。
 - **推論與規則解耦**:GPU 只跑一次姿態抽取落成 keypoint cache,調參/評估為秒級 CPU 工作。
 
+## Demo
+
+<table>
+<tr>
+<td align="center"><b>跌倒 → 正確觸發 ALARM</b></td>
+<td align="center"><b>日常動作(ADL)→ 正確不觸發</b></td>
+</tr>
+<tr>
+<td><img src="assets/demo_fall.gif" width="400"></td>
+<td><img src="assets/demo_adl.gif" width="400"></td>
+</tr>
+</table>
+
+兩支都是實際跑完整條 pipeline 的畫面(非後製剪輯),用
+[notebooks/05_gradio_demo.ipynb](notebooks/05_gradio_demo.ipynb) 啟動的 Gradio demo 直接
+螢幕錄影:`fall-06`(tune split)展示跌倒正確觸發紅色 ALARM 橫幅;`adl-01`(test split)
+展示日常動作(過程中甚至有蹲下這種容易與跌倒混淆的姿勢)全程正確保持 UPRIGHT、不誤觸。
+
 ## 狀態
 
 | 里程碑 | 內容 | 狀態 |
@@ -22,7 +40,7 @@
 | M3 | URFD 全量抽取 | ✅ |
 | M4 | 閾值校準 + 評估 + 失敗分析 | ✅ |
 | M5 | FPS benchmark | ✅ |
-| M6 | Gradio demo | 🔄 |
+| M6 | Gradio demo | ✅ |
 | M7 | README 定稿 | ⬜ |
 
 ## 評估
@@ -115,6 +133,12 @@ track id 鏈是否有交集,縫合一旦失敗就無法回頭補救,即使兩段
   伸展動作的場域需重新校準。
 - **track 縫合/事件合併縫隙**(見上方 `fall-08` 分析):跨 track id 鏈的事件
   合併目前只認 id 交集,不認時間相鄰 + 空間鄰近。
+- **收尾事件不一定會顯示即時 ALARM 畫面**:`track_lost_while_fallen` 這類收尾
+  規則能正確記錄事件,但如果一次跌倒過程 track id 反覆中斷(如 `fall-01`:
+  1→3→5 換了三次),「持續躺姿」的計時會跟著中斷重算,狀態機永遠撐不到即時
+  的 FALLEN→ALARM 轉換,只能靠影片結束時的收尾機制補判——事件本身正確,但
+  標註影片上看不到紅色 ALARM 橫幅。demo GIF 因此選了 track id 全程穩定的
+  `fall-06`,而非最早測試、更能體現縫合機制韌性的 `fall-01`。
 - **慢速跌倒是規則法已知盲區**(見 `tests/test_engine.py` 的
   `test_slow_lie_down_no_event`):速度/角速度是進入 FALLING 的必要條件,
   刻意緩慢的跌倒或躺下不會觸發。

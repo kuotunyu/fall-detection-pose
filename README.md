@@ -17,14 +17,10 @@
 ## Demo
 
 <table>
-<tr>
-<td align="center"><b>跌倒 → 正確觸發 ALARM</b></td>
-<td align="center"><b>日常動作(ADL)→ 正確不觸發</b></td>
-</tr>
-<tr>
-<td><img src="assets/demo_fall.gif" width="400"></td>
-<td><img src="assets/demo_adl.gif" width="400"></td>
-</tr>
+<tr><td align="center"><b>跌倒 → 正確觸發 ALARM</b></td></tr>
+<tr><td align="center"><img src="assets/demo_fall.gif" width="600"></td></tr>
+<tr><td align="center"><b>日常動作(ADL)→ 正確不觸發</b></td></tr>
+<tr><td align="center"><img src="assets/demo_adl.gif" width="600"></td></tr>
 </table>
 
 兩支都是實際跑完整條 pipeline 的畫面(非後製剪輯),用

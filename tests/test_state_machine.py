@@ -67,6 +67,35 @@ def test_finalize_while_fallen_still_closes_event(cfg):
     assert "lying_persisted" not in events[0].rules_fired  # 沒撐到 ALARM,不該有這個 tag
 
 
+def test_finalize_while_falling_with_lying_posture_closes_event(cfg):
+    """FALLING 中 track 消失,躺姿投票視窗還沒累積夠樣本確認,但最後一次
+    平滑觀測已符合躺姿 m-of-n:仍應收尾為一次事件——這正是 URFD test split
+    fall-24 踩到的真實案例(訊號都到位,只是資料在視窗跑完前就斷了)。"""
+    fsm = FallStateMachine(cfg.rules, track_id=1)
+    t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
+    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
+    assert fsm.state is State.FALLING
+    t, f = t + DT, f + 1
+    # 只餵 1 幀躺姿(遠不足以撐滿 window_confirm_s 的時窗投票),track 就此消失
+    fsm.tick(TickInput(t_s=t, frame_idx=f, **LYING_KW))
+    events = fsm.finalize()
+    assert len(events) == 1
+    assert "track_lost_while_falling_with_lying_posture" in events[0].rules_fired
+    assert "posture_vote_confirmed" not in events[0].rules_fired  # 投票視窗真的沒跑完
+
+
+def test_finalize_while_falling_without_lying_posture_no_event(cfg):
+    """負向對照:FALLING 中 track 消失,但最後觀測並不符合躺姿(如坐姿):
+    不該生出事件——避免這個新規則過度寬鬆,只認最後一次真的像躺姿的情況。"""
+    fsm = FallStateMachine(cfg.rules, track_id=1)
+    t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
+    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
+    assert fsm.state is State.FALLING
+    t, f = t + DT, f + 1
+    fsm.tick(TickInput(t_s=t, frame_idx=f, **SIT_KW))  # 坐姿:不符合躺姿 m-of-n
+    assert fsm.finalize() == []
+
+
 def test_bridge_gap_prevents_false_falling_timeout(cfg):
     """縫合空窗若不橋接,消失期間的時間差會被誤算成「觀察了這麼久還沒確認」,
     導致 falling-timeout 誤回退——這正是 URFD fall-01 煙測踩到的真實案例

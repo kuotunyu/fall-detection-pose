@@ -21,8 +21,8 @@ def _cache_entry(df):
 
 
 def test_make_param_grid_keeps_hysteresis_valid():
-    grid = make_param_grid([0.35], [1.0, 1.5], [50, 60], [1.0])
-    assert len(grid) == 1 * 2 * 2 * 1
+    grid = make_param_grid([0.35], [1.0, 1.5], [50, 60], [1.0], [0.4])
+    assert len(grid) == 1 * 2 * 2 * 1 * 1
     for combo in grid:
         assert combo["theta_upright_exit"] < combo["theta_lying_enter"]
         assert "conf" not in combo  # model.conf 已烘進 cache,不應出現在這個網格裡

@@ -47,6 +47,7 @@ def make_param_grid(
     v_fall_enter_values: list[float],
     theta_lying_enter_values: list[float],
     t_confirm_fallen_s_values: list[float],
+    window_confirm_s_values: list[float],
     theta_hysteresis_gap: float = 20.0,
 ) -> list[dict]:
     """建構本專案 M4 使用的參數網格。
@@ -57,10 +58,20 @@ def make_param_grid(
 
     只網格搜尋規則引擎階段仍可調的參數(見上方 ``_MODEL_FIELDS`` 註解);
     ``model.conf`` 已烘進 cache,不在這個網格裡。
+
+    ``window_confirm_s``(躺姿投票時窗)是第二輪才加入的維度:第一輪調參
+    發現多支跌倒影片在 FALLING 觸發、姿態也已達標之後,track 就在時窗投票
+    還沒累積夠樣本前消失(見 state_machine.finalize 對這個情境的收尾規則)。
+    縮小這個時窗能讓確認更快發生,直接針對這個失敗模式;但窗太小也會讓
+    單幀雜訊更容易誤觸發,因此仍是候選網格的一員而非直接調小,讓資料自己說話。
     """
     combos = []
-    for kpt_conf_min, v, theta, tconf in itertools.product(
-        kpt_conf_min_values, v_fall_enter_values, theta_lying_enter_values, t_confirm_fallen_s_values
+    for kpt_conf_min, v, theta, tconf, wconf in itertools.product(
+        kpt_conf_min_values,
+        v_fall_enter_values,
+        theta_lying_enter_values,
+        t_confirm_fallen_s_values,
+        window_confirm_s_values,
     ):
         combos.append(
             {
@@ -69,6 +80,7 @@ def make_param_grid(
                 "theta_lying_enter": theta,
                 "theta_upright_exit": theta - theta_hysteresis_gap,
                 "t_confirm_fallen_s": tconf,
+                "window_confirm_s": wconf,
             }
         )
     return combos

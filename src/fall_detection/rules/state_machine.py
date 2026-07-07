@@ -11,6 +11,10 @@
     FALLEN ─(track 消失/finalize,未撐到 ALARM)→ 仍收尾為一次事件:
              躺姿已通過投票確認,消失後多半是持續倒地不起
              (pose 模型對躺姿本身較弱,常見整段掉偵測),寧可觸發不可漏判
+    FALLING ─(track 消失/finalize,最後一次觀察已符合躺姿 m-of-n)→ 仍收尾為一次事件:
+             躺姿投票需要在時窗內累積夠多樣本才能「確認」,但 track 常常
+             恰好在姿態剛轉為躺姿、視窗還沒累積完就整個消失(同一個 pose
+             模型弱點);最後一次平滑後的觀測已經符合躺姿,比空手回去更可信
 
 事件的起點是「進入 FALLING 的幀」(跌倒開始),而非 ALARM 的幀——
 告警需要去抖動延遲,但事件時間軸要對齊真實跌倒,評估才公平。
@@ -77,6 +81,7 @@ class FallStateMachine:
         self._alarm_open: bool = False
         self._last_t: float | None = None
         self._last_frame: int | None = None
+        self._last_lying: bool = False
 
     # ---------- 對外 ----------
 
@@ -116,6 +121,7 @@ class FallStateMachine:
         self._last_t, self._last_frame = x.t_s, x.frame_idx
 
         lying_now = self._posture_lying(x)
+        self._last_lying = lying_now
         self._push_vote(x.t_s, lying_now)
         self._update_recover(x, lying_now)
         if self._ctx is not None:
@@ -183,12 +189,18 @@ class FallStateMachine:
         """track 結束(消失逾時或影片結尾):關閉進行中的事件並回傳全部事件。
 
         ALARM 中結束自然收尾;FALLEN 中結束(躺姿已投票確認,但尚未撐滿
-        t_confirm_fallen_s)也視為一次事件收尾——見上方 FSM 圖說明。
+        t_confirm_fallen_s)也視為一次事件收尾;FALLING 中結束但最後一次
+        平滑觀測已符合躺姿 m-of-n(只是時窗投票還沒累積足夠樣本)同樣收尾
+        ——見上方 FSM 圖說明,三者都是同一個道理:track 消失的當下已有夠強的
+        單幀證據,不該因為視窗化的去抖動機制來不及跑完就整個丟棄。
         """
         if self._alarm_open and self._last_frame is not None:
             self._close_event(self._last_frame, self._last_t)
         elif self.state is State.FALLEN and self._last_frame is not None:
             self._ctx.rules_fired.add("track_lost_while_fallen")
+            self._close_event(self._last_frame, self._last_t)
+        elif self.state is State.FALLING and self._last_lying and self._last_frame is not None:
+            self._ctx.rules_fired.add("track_lost_while_falling_with_lying_posture")
             self._close_event(self._last_frame, self._last_t)
         self._ctx = None
         self._alarm_open = False

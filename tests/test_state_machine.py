@@ -120,19 +120,26 @@ def test_bridge_gap_prevents_false_falling_timeout(cfg):
 def test_bridge_gap_does_not_pollute_vote_window_with_stale_samples(cfg):
     """bridge_gap 位移 _falling_since 等單一時間戳,但刻意不位移 _vote_win:
     否則空窗前的舊「未躺」樣本會被誤認成剛觀察到,拖累縫合後的躺姿投票比例,
-    延誤本該在 window_confirm_s 內就能確認的 FALLEN 判定。"""
-    fsm = FallStateMachine(cfg.rules, track_id=1)
+    延誤本該在 window_confirm_s 內就能確認的 FALLEN 判定。
+
+    這裡只測 FALLEN 判定本身,刻意把 t_confirm_fallen_s 拉大避免又滑進 ALARM
+    (那是另一段去抖動,與這個測試想驗證的「投票視窗有沒有被污染」無關)。
+    """
+    rules = cfg.rules.model_copy(update={"t_confirm_fallen_s": 5.0})
+    fsm = FallStateMachine(rules, track_id=1)
     t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
     fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
     # 短暫停留 FALLING,累積幾幀「尚未躺平」的 False 投票樣本
-    t, f = _feed(fsm, t + DT, 0.3, f + 1, theta_deg=40.0, bbox_aspect=0.7, h_hip=1.0, v_norm=2.0, omega=0.0)
+    # (相對 cfg 取值,落在遲滯出口與進入閾值之間,不誤觸任何一個邊界)
+    not_lying_theta = rules.theta_lying_enter - 15
+    t, f = _feed(fsm, t + DT, 0.3, f + 1, theta_deg=not_lying_theta, bbox_aspect=0.7, h_hip=1.0, v_norm=2.0, omega=0.0)
     assert fsm.state is State.FALLING
     fsm.adopt(9)
     fsm.bridge_gap(1.5)
     t2 = t + 1.5
     # 縫合後立刻是清楚的躺姿,只餵 window_confirm_s 多一點:若舊樣本沒被正確
     # 排除,比例會被拖低而確認不了
-    t2, f = _feed(fsm, t2, cfg.rules.window_confirm_s + 0.2, f, **LYING_KW)
+    t2, f = _feed(fsm, t2, rules.window_confirm_s + 0.2, f, **LYING_KW)
     assert fsm.state is State.FALLEN
 
 
@@ -160,13 +167,18 @@ def test_fallen_recovery_before_confirm_yields_no_event(cfg):
 
 
 def test_hysteresis_no_chatter_around_lying_threshold(cfg):
-    """θ 在躺姿進入閾值(60°)附近震盪:遲滯出口(40°)未觸及 → 狀態不抖、事件不碎。"""
+    """θ 在躺姿進入閾值附近震盪(相對 cfg 取值,不寫死絕對角度,調參後仍成立):
+    遲滯出口(間距 20°,見 theta_hysteresis_gap)未觸及 → 狀態不抖、事件不碎。"""
     fsm, t, f = _fall_to_alarm(cfg)
+    theta_hi = cfg.rules.theta_lying_enter + 2
+    theta_lo = cfg.rules.theta_lying_enter - 2
+    h_hip_hi = cfg.rules.h_hip_lying + 0.05
+    h_hip_lo = cfg.rules.h_hip_lying - 0.05
     states = []
     n = round(3.0 / DT)
     for i in range(n):
-        theta = 62.0 if i % 2 == 0 else 58.0
-        h_hip = 0.55 if i % 2 == 0 else 0.45
+        theta = theta_hi if i % 2 == 0 else theta_lo
+        h_hip = h_hip_hi if i % 2 == 0 else h_hip_lo
         fsm.tick(TickInput(t_s=t + i * DT, frame_idx=f + i, theta_deg=theta,
                            bbox_aspect=1.2, h_hip=h_hip, v_norm=0.0, omega=0.0))
         states.append(fsm.state)

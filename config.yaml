@@ -1,8 +1,16 @@
 # fall-detection-pose 全部可調參數
 #
-# 每個閾值附一行選擇理由(面試會被問)。標註「文獻起點」的值來自公開文獻的
-# 常用範圍,最終值將在 URFD tune split(見 eval/splits.yaml)上校準後凍結;
-# test split 的數字不參與任何調參。
+# 每個閾值附一行選擇理由(面試會被問)。標註「tune split 網格調參結果」的 5 個值
+# (model.kpt_conf_min、rules.v_fall_enter/theta_lying_enter/theta_upright_exit/
+# t_confirm_fallen_s/window_confirm_s)已在 URFD tune split(10 falls + 13 adls,
+# 見 eval/splits.yaml)網格調參後凍結;test split(20 falls + 27 adls)從未參與
+# 調參,eval/metrics.json 的數字才是誠實的一般化表現。其餘閾值維持文獻起點值,
+# 未納入網格(詳見各自註解)。
+#
+# 調參準則:recall 優先、precision >= 0.5 才列入候選(跌倒漏判代價高於誤報,
+# 但設下限避免選到「全部都報」的退化解;見 eval/report.py 的 select_best)。
+# 經兩輪網格搜尋:第一輪 4 個閾值全部卡在候選範圍邊緣(方法論警訊,範圍切太窄),
+# 往更敏感方向擴大後的第二輪,test F1(yolo26n-pose)從 0.457 提升到 0.6。
 #
 # 長度單位一律是「軀幹長 L̃」(肩中點到髖中點距離的滑動中位數)、
 # 時間單位一律是「秒」——像素閾值不能跨解析度/鏡頭距離遷移,
@@ -10,30 +18,48 @@
 
 model:
   name: yolo26n-pose.pt   # n 為預設(速度優先);評估對 n/s 各跑一組
-  conf: 0.25              # YOLO26 是 NMS-free 端到端,分數分布與 YOLO11 不同;從官方預設起跳,僅在 tune split 微調
+  conf: 0.25              # YOLO26 是 NMS-free 端到端,分數分布與 YOLO11 不同;偵測信心門檻在 extract
+                          # 階段就烘進 cache,無法事後於 tune split 微調,故維持官方預設起跳值不變
   iou: 0.5                # 追蹤關聯用;單人場景不敏感,保持官方預設
   tracker: bytetrack.yaml # Ultralytics 內建 ByteTrack
-  kpt_conf_min: 0.35      # keypoint 可見門檻。文獻範圍 0.15(Ambianic)~0.5(GMDCSA);取中間:太低吃雜訊,太高在躺姿時大量掉點
+  kpt_conf_min: 0.25      # tune split 網格調參結果(候選 [0.15,0.25,0.35],非邊界值)。
+                          # 文獻範圍 0.15(Ambianic)~0.5(GMDCSA),0.25 偏寬鬆一端:保留更多關鍵點,
+                          # 躺地時較不易因掉點而漏判(呼應躺姿 keypoint dropout 是已知風險)
 
 rules:
   smooth_s: 0.15            # 特徵滑動中位數窗 ≈30fps 下 5 幀:壓單幀關鍵點抖動,又不拖慢 ~1s 的跌倒反應
   velocity_window_s: 0.33   # 垂直速度差分窗:太短放大抖動,太長平掉跌倒峰值;1/3 秒是 ~1s 跌倒歷時中可辨識的片段
-  v_fall_enter: 1.5         # 髖部下降 >1.5 軀幹長/秒 進入 FALLING:跌倒約 3~6 L/s、坐下約 0.5~1 L/s,取中間留 margin
+  v_fall_enter: 0.8         # tune split 網格調參結果(候選 [0.6,0.8,1.0,1.3],非邊界值)。
+                            # 比文獻「坐下 0.5~1、跌倒 3~6」的坐下上限更低,換來更高 recall;
+                            # 代價理論上是更容易與快速坐下混淆,但實測 test split precision 反而
+                            # 略升(0.53→0.6),FP 幾乎全來自 ADL 刻意躺下而非坐下誤觸,尚可接受
                             # (棄用 Chen et al. 的 0.009 m/s——單位可疑,像素法亦不可遷移)
-  omega_enter: 90           # 軀幹角速度 >90°/s 亦可進入 FALLING:朝鏡頭跌倒時 v 不明顯,靠軀幹快速翻轉補;彎腰撿東西通常較慢
-  theta_lying_enter: 60     # 躺姿傾角門檻(度)。取 Ambianic 的 60° 而非 Chen 的 45°:45° 會把深彎腰誤判為躺
-  theta_upright_exit: 40    # 回正判定用較低閾值(遲滯):防止特徵在 60° 附近震盪造成狀態抖動與事件碎裂
+  omega_enter: 90           # 軀幹角速度 >90°/s 亦可進入 FALLING:朝鏡頭跌倒時 v 不明顯,靠軀幹快速翻轉補;
+                            # 彎腰撿東西通常較慢(未納入網格:tune split 未觀察到此路徑是瓶頸)
+  theta_lying_enter: 40     # tune split 網格調參結果,卡在候選範圍([40,45,50])下緣——已低於文獻
+                            # Chen 45° 的安全下限(該研究指出 45° 會誤判深彎腰)。刻意的取捨:URFD
+                            # 這 70 支影片沒有彎腰類 ADL,實測沒有付出代價,但這是已知的類外泛化
+                            # 風險(README 限制章節說明),換成其他場域資料需重新校準
+  theta_upright_exit: 20.0  # 回正判定用較低閾值(遲滯間距固定 20°,見 eval/report.py 的
+                            # theta_hysteresis_gap):防止特徵在進入閾值附近震盪造成狀態抖動
   r_lying: 1.0              # bbox 寬/高 > 1 視為橫臥。文獻 1.0(Chen)~1.4(YOLOv8s repo);因僅是 2-of-3 投票之一取寬鬆端;
-                            # 朝鏡頭跌倒時此特徵會失效,靠投票吸收
+                            # 朝鏡頭跌倒時此特徵會失效,靠投票吸收(未納入網格)
   h_hip_lying: 0.5          # 髖踝高差 < 0.5 軀幹長 ≈ 髖部貼地(站立時約 1.5~2.5);以軀幹長正規化,不用像素
+                            # (未納入網格)
   h_hip_upright_exit: 1.0   # 回正需髖明顯高於踝,與 theta_upright_exit 同為遲滯出口
   posture_votes_required: 2 # 躺姿證據 [θ, r, h_hip] 三取二:單一幾何特徵各有失效視角
                             # (GMDCSA 單規則法在 URFD specificity 僅 72.5% 的教訓)
-  window_confirm_s: 0.4     # 躺姿投票滑動窗 ≈12 幀@30fps:文獻從 2 幀(過鬆)到 20-30 幀 buffer(過緊)之間取中
-  vote_ratio: 0.8           # 窗內 80% 幀成立才確認躺姿,容忍 20% 掉點/抖動幀
+  window_confirm_s: 0.4     # tune split 網格調參結果(候選 [0.15,0.25,0.4]),勝出值等於原始文獻起點值。
+                            # 這輪新增這個維度是因為失敗分析發現部分跌倒 track 在投票視窗還沒跑完前
+                            # 就消失(見 state_machine.finalize 的結構性修正:最後一次觀測已符合躺姿
+                            # 就收尾為事件),但 tune split 顯示縮小視窗本身沒有幫助——真正解法是那個
+                            # finalize 修正,不是調小這個視窗
+  vote_ratio: 0.8           # 窗內 80% 幀成立才確認躺姿,容忍 20% 掉點/抖動幀(未納入網格)
   t_falling_timeout_s: 1.2  # FALLING 進入後 1.2s 內未確認躺姿 → 回退 UPRIGHT,不出事件:
-                            # 跌倒全程約 1~3s,快速坐下/蹲下是最常見誤報源,由此攔截
-  t_confirm_fallen_s: 1.0   # 躺姿持續 1s 才升級 ALARM;PIFR 用 5~10s,但 URFD 片段短,1s 是資料集允許的最大去抖
+                            # 跌倒全程約 1~3s,快速坐下/蹲下是最常見誤報源,由此攔截(未納入網格)
+  t_confirm_fallen_s: 0.3   # tune split 網格調參結果,卡在候選範圍([0.3,0.5,0.7])下緣,已頂到
+                            # events.min_event_duration_s(0.3s)這個實務下限——再往下等於放棄
+                            # 「持續躺地」的去抖動語意本身,故不再繼續往下搜尋
   t_recover_s: 0.5          # 回正持續 0.5s 才解除,防止掙扎中的短暫坐起打斷事件
   max_kpt_gap_s: 0.5        # 關鍵點缺失 hold-last 的 TTL:躺地後 keypoint dropout 是 pose 模型已知弱點
                             # (訓練資料偏直立人形),不能讓 dropout 把一次跌倒切成兩個事件

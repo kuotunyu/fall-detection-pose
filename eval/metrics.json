@@ -1,0 +1,89 @@
+{
+  "protocol": {
+    "description": "Event-level precision/recall/F1 on UR Fall Detection Dataset. tune split used for threshold grid search only; test split never used for tuning. ADL videos always have 0 fall-GT (any predicted event on an ADL video counts as FP), including ADL sequences whose posture labels show a lying interval (URFD's ADL set deliberately includes voluntary lying down).",
+    "tol_s": 0.5,
+    "splits_seed": 42,
+    "splits_counts": {
+      "tune_falls": 10,
+      "tune_adls": 13,
+      "test_falls": 20,
+      "test_adls": 27
+    }
+  },
+  "winning_params": {
+    "kpt_conf_min": 0.25,
+    "v_fall_enter": 0.8,
+    "theta_lying_enter": 40,
+    "theta_upright_exit": 20.0,
+    "t_confirm_fallen_s": 0.3,
+    "window_confirm_s": 0.4
+  },
+  "tune_metrics_yolo26n_pose": {
+    "tol_s": 0.5,
+    "tp": 6,
+    "fp": 0,
+    "fn": 4,
+    "precision": 1.0,
+    "recall": 0.6,
+    "f1": 0.7499999999999999,
+    "video_level_specificity": 1.0,
+    "n_videos": 23,
+    "n_adl_videos": 13
+  },
+  "test_metrics_yolo26n_pose": {
+    "tol_s": 0.5,
+    "tp": 12,
+    "fp": 8,
+    "fn": 8,
+    "precision": 0.6,
+    "recall": 0.6,
+    "f1": 0.6,
+    "video_level_specificity": 0.7407407407407407,
+    "n_videos": 47,
+    "n_adl_videos": 27
+  },
+  "test_metrics_yolo26s_pose": {
+    "tol_s": 0.5,
+    "tp": 11,
+    "fp": 7,
+    "fn": 9,
+    "precision": 0.6111111111111112,
+    "recall": 0.55,
+    "f1": 0.5789473684210527,
+    "video_level_specificity": 0.7777777777777778,
+    "n_videos": 47,
+    "n_adl_videos": 27
+  },
+  "failure_cases_test_yolo26n_pose": {
+    "fp": [
+      {"name": "fall-08", "intervals": [[2.367, 3.0]]},
+      {"name": "adl-10", "intervals": [[7.067, 9.967]]},
+      {"name": "adl-11", "intervals": [[6.9, 9.967]]},
+      {"name": "adl-30", "intervals": [[7.267, 8.233]]},
+      {"name": "adl-31", "intervals": [[4.633, 8.3]]},
+      {"name": "adl-34", "intervals": [[2.667, 6.3]]},
+      {"name": "adl-38", "intervals": [[4.633, 9.9]]},
+      {"name": "adl-39", "intervals": [[4.933, 8.967]]}
+    ],
+    "fn": [
+      {"name": "fall-17", "intervals": [[1.9666666666666666, 3.1666666666666665]]},
+      {"name": "fall-19", "intervals": [[0.8333333333333334, 3.3333333333333335]]},
+      {"name": "fall-21", "intervals": [[0.7, 1.8333333333333333]]},
+      {"name": "fall-25", "intervals": [[1.5, 2.8333333333333335]]},
+      {"name": "fall-26", "intervals": [[0.43333333333333335, 2.033333333333333]]},
+      {"name": "fall-28", "intervals": [[0.9, 2.2]]},
+      {"name": "fall-29", "intervals": [[1.6333333333333333, 3.3]]},
+      {"name": "fall-30", "intervals": [[0.8333333333333334, 2.3333333333333335]]}
+    ]
+  },
+  "tuning_history": {
+    "round_1": {
+      "note": "All 4 tuned thresholds landed on the grid boundary - search range too narrow, not a true optimum.",
+      "test_metrics_yolo26n_pose": {"tp": 8, "fp": 7, "fn": 12, "precision": 0.5333333333333333, "recall": 0.4, "f1": 0.4571428571428572}
+    },
+    "round_2": {
+      "note": "Widened all 4 dimensions + added window_confirm_s as a 5th dimension, motivated by a structural finalize-while-FALLING fix. kpt_conf_min and v_fall_enter landed interior; theta_lying_enter and t_confirm_fallen_s still at their (now principled) floor - see config.yaml rationale comments.",
+      "test_metrics_yolo26n_pose": {"tp": 12, "fp": 8, "fn": 8, "precision": 0.6, "recall": 0.6, "f1": 0.6}
+    }
+  }
+}

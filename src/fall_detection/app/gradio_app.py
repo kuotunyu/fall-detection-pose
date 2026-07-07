@@ -40,9 +40,10 @@ def process_video(
 ) -> tuple[str, list[list], str]:
     """上傳影片 → (標註影片路徑, 事件表格 rows, events.json 路徑)。
 
-    每次呼叫用獨立暫存目錄(demo 的 ``concurrency_limit=1`` 保證不會有兩個
-    請求同時寫入同一目錄);暫存檔不主動清除——Colab session 本身是暫時性的,
-    多留幾份輸出檔案不影響正確性,清理它們不會讓 demo 更正確,純屬多餘的複雜度。
+    固定用同一個工作目錄(每次呼叫覆寫上一次的輸出),不是每次呼叫都開新的
+    ``mkdtemp``:demo 的 ``concurrency_limit=1`` 保證不會有兩個請求同時寫入,
+    這在 Colab 這種一次性 session 裡無關緊要,但這個 app 也會部署成長時間跑的
+    HF Space,每次呼叫都留一份新暫存檔會讓磁碟用量無界成長。
     """
     if not video_path:
         raise ValueError("請先上傳影片")
@@ -62,7 +63,8 @@ def process_video(
     if model_name:
         cfg.model.name = model_name
 
-    work_dir = Path(tempfile.mkdtemp(prefix="fdp_demo_"))
+    work_dir = Path(tempfile.gettempdir()) / "fdp_demo_workdir"
+    work_dir.mkdir(parents=True, exist_ok=True)
     cache_path = work_dir / "cache.parquet"
     annotated_path = work_dir / "annotated.mp4"
     events_path = work_dir / "events.json"

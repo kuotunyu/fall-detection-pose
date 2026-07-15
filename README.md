@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 
 以 **YOLO26-pose 預訓練模型 + ByteTrack 多目標追蹤**為基礎的規則式(rule-based)跌倒偵測系統。
 本專案重點不在模型創新,而在工程能力:
@@ -9,7 +10,8 @@
 - **可解釋的規則引擎**:每個 track 一台狀態機(UPRIGHT → FALLING → FALLEN → ALARM),
   所有閾值集中於 [config.yaml](config.yaml),每個值附選擇理由與文獻出處。
 - **event-level 誠實評估**:在 UR Fall Detection Dataset(30 falls + 40 ADL)上以
-  明確定義的事件配對協定計算 precision / recall / F1;tune/test 切分防止「在測試集上調參」。
+  明確定義的事件配對協定計算 precision / recall / F1；閾值只在 tune split 搜尋，
+  並如實揭露第一輪 test 後仍做過一次結構性修正。
 - **失敗分析**:對誤報與漏報案例附特徵時序圖,展示規則「為什麼」觸發或錯過。
 - **推論與規則解耦**:GPU 只跑一次姿態抽取落成 keypoint cache,調參/評估為秒級 CPU 工作。
 
@@ -26,6 +28,23 @@
 [notebooks/05_gradio_demo.ipynb](notebooks/05_gradio_demo.ipynb) 啟動的 Gradio demo 直接
 螢幕錄影:`fall-06`(tune split)展示跌倒正確觸發紅色 ALARM 橫幅;`adl-01`(test split)
 展示日常動作(過程中甚至有蹲下這種容易與跌倒混淆的姿勢)全程正確保持 UPRIGHT、不誤觸。
+
+## 一眼看重點（At a glance）
+
+| 指標 | 結果 |
+|---|---:|
+| Fixed test-split event-level F1（yolo26n-pose） | **0.600** |
+| Fixed test-split video-level specificity（yolo26n-pose） | **0.741** |
+| T4 FP16 端到端速度（yolo26n-pose） | **64.64 FPS** |
+| 2-vCPU CPU 端到端速度（yolo26n-pose） | **8.23 FPS** |
+| 離線單元測試 | **86 tests** |
+
+F1 與 specificity 來自固定 test split（20 falls + 27 ADL）；所有閾值只在 tune split
+搜尋，但第一輪 test 指標看過後仍修正了一個事件收尾 bug，再重新評估。因此這是透明的
+post-development estimate，不是 pristine one-shot holdout。速度是單一 150-frame
+`adl-01` 片段各跑 3 次的環境特定 benchmark，不代表所有影片或硬體；完整協定與
+p50/p95 見[評估](#評估)與 [Benchmark](#benchmark)。[CI](.github/workflows/ci.yml)
+只安裝輕量核心與開發依賴，自動執行相同的 86 項測試及 Ruff，不下載模型或安裝 GPU stack。
 
 ## 快速開始
 
@@ -167,18 +186,20 @@ FALLING 但最後一次平滑觀測已符合躺姿投票同樣收尾。三者背
 每個 GT 貪婪配對交集最大的一個預測(一對一)。ADL 影片一律視為 0 個跌倒 GT
 ——即使該影片的姿態標註本身出現「躺姿」區間(URFD 的 ADL 集合刻意包含主動
 躺下,如躺床上,用來測試誤報率),任何預測事件都算 FP。閾值全部在 tune split
-(10 falls + 13 adls)網格搜尋校準凍結(見 [config.yaml](config.yaml));
-以下為 **test split**(20 falls + 27 adls,從未參與調參)的結果,原始數字見
-[eval/metrics.json](eval/metrics.json)。
+(10 falls + 13 adls)網格搜尋(見 [config.yaml](config.yaml)),test 沒有進入閾值
+選擇。不過第一輪 test 指標看過後仍修正了一個結構性事件收尾 bug 並重跑評估，
+所以以下 **test split**(20 falls + 27 adls)結果應視為 post-development estimate，
+而非完全 untouched holdout。原始數字與兩輪紀錄見 [eval/metrics.json](eval/metrics.json)。
 
 | 模型 | Precision | Recall | F1 | Video-level Specificity |
 |---|---|---|---|---|
 | yolo26n-pose(預設) | 0.600 | 0.600 | 0.600 | 0.741 |
 | yolo26s-pose | 0.611 | 0.550 | 0.579 | 0.778 |
 
-調參經過兩輪:第一輪勝出的 4 個閾值全部卡在候選範圍邊緣(方法論警訊,代表
+開發經過兩輪:第一輪勝出的 4 個閾值全部卡在候選範圍邊緣(方法論警訊,代表
 範圍切太窄);往更敏感方向擴大網格、並修掉一個結構性 bug(track 消失時最後
-觀測已符合躺姿卻沒收尾成事件)後,第二輪 F1(yolo26n-pose)從 0.457 提升到
+觀測已符合躺姿卻沒收尾成事件)後,固定 test split 的第二輪 F1(yolo26n-pose)
+從 0.457 提升到
 0.600。調參準則:recall 優先、precision ≥ 0.5 才列入候選——跌倒漏判(沒人去
 查看)的代價高於一次誤報。
 
@@ -291,7 +312,7 @@ track id 鏈是否有交集,縫合一旦失敗就無法回頭補救,即使兩段
 
 ```
 fall-detection-pose/
-├── pyproject.toml       # uv;依賴分層:core(規則引擎)/ [infer](GPU 推論)/ [demo](Gradio)/ [plot]
+├── pyproject.toml       # uv;依賴分層:core(規則引擎)/ `infer`(GPU 推論)/ `demo`(Gradio)/ `plot`
 ├── config.yaml          # 全部可調參數,每項附選擇理由與 tune-split 校準紀錄
 ├── plan.md              # 原始實作計畫(核准後逐里程碑執行)
 ├── eval/splits.yaml     # tune/test 切分名單(seed=42,凍結進版控)

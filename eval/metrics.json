@@ -1,6 +1,6 @@
 {
   "protocol": {
-    "description": "Event-level precision/recall/F1 on UR Fall Detection Dataset. tune split used for threshold grid search only; test split never used for tuning. ADL videos always have 0 fall-GT (any predicted event on an ADL video counts as FP), including ADL sequences whose posture labels show a lying interval (URFD's ADL set deliberately includes voluntary lying down).",
+    "description": "Event-level precision/recall/F1 on UR Fall Detection Dataset. Threshold grid search used the tune split only; test metrics were reviewed after round 1, followed by a structural event-finalization fix and a second evaluation. Final test metrics are therefore transparent post-development estimates, not a pristine one-shot holdout. ADL videos always have 0 fall-GT (any predicted event on an ADL video counts as FP), including ADL sequences whose posture labels show a lying interval (URFD's ADL set deliberately includes voluntary lying down).",
     "tol_s": 0.5,
     "splits_seed": 42,
     "splits_counts": {

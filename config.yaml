@@ -1,11 +1,12 @@
 # fall-detection-pose 全部可調參數
 #
-# 每個閾值附一行選擇理由(面試會被問)。標註「tune split 網格調參結果」的 5 個值
-# (model.kpt_conf_min、rules.v_fall_enter/theta_lying_enter/theta_upright_exit/
+# 每個閾值附一行選擇理由(面試會被問)。標註「tune split 網格調參結果」的 5 個
+# 搜尋維度(model.kpt_conf_min、rules.v_fall_enter/theta_lying_enter/
 # t_confirm_fallen_s/window_confirm_s)已在 URFD tune split(10 falls + 13 adls,
-# 見 eval/splits.yaml)網格調參後凍結;test split(20 falls + 27 adls)從未參與
-# 調參,eval/metrics.json 的數字才是誠實的一般化表現。其餘閾值維持文獻起點值,
-# 未納入網格(詳見各自註解)。
+# 見 eval/splits.yaml)搜尋;theta_upright_exit 由固定 20° 遲滯間距推導。test 沒有
+# 進入閾值候選評分,但第一輪 test 指標看過後仍修正了一個結構性事件收尾 bug 並
+# 重跑評估,所以 eval/metrics.json 是 post-development estimate,不是 pristine
+# one-shot holdout。其餘閾值維持文獻起點值,未納入網格(詳見各自註解)。
 #
 # 調參準則:recall 優先、precision >= 0.5 才列入候選(跌倒漏判代價高於誤報,
 # 但設下限避免選到「全部都報」的退化解;見 eval/report.py 的 select_best)。

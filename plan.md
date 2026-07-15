@@ -23,9 +23,9 @@
 
 - **YOLO26-pose 已釋出**:`yolo26n-pose.pt` / `yolo26s-pose.pt` 在 ultralytics/assets **v8.4.0**(2026-01-13)release assets 中。COCO-pose mAP(50-95):n=57.2、s=63.0。→ pin `ultralytics>=8.4`。
 - **API**:`model.track(frame, tracker='bytetrack.yaml', persist=True, conf=…, iou=…)`;讀 `results[0].keypoints.xy / .conf`(**conf 可為 None**)、`results[0].boxes.id`(**可為 None**);COCO 17 keypoints。`persist=True` 只用在自己逐幀餵的迴圈。YOLO26 是 NMS-free 端到端,conf 分布與 YOLO11 不同 → conf 閾值在 tune split 校準,不抄舊教學。
-- **URFD**:官方頁 `https://fenix.ur.edu.pl/~mkepski/ds/uf.html`(舊網域 fenix.univ.rzeszow.pl 已死)。逐檔下載 `…/ds/data/fall-01-cam0-rgb.zip`,無打包檔;cam0 RGB 全部約 **4.5GB**。cam0=平行地面側視(用這個)、cam1=天花板俯視;**ADL 只有 cam0**。640×480 @30fps PNG 序列。標註 `urfall-cam0-falls.csv` / `urfall-cam0-adls.csv`:`label ∈ {-1 未躺, 0 跌落中, 1 躺地}`。授權 **CC BY-NC-SA 4.0**(資料不進 git、不重傳);引用:Kwolek & Kepski 2014, CMPB, DOI 10.1016/j.cmpb.2014.09.005。Kaggle 鏡像授權標示 Unknown → 只作備援。
+- **URFD**:官方頁 `https://fenix.ur.edu.pl/~mkepski/ds/uf.html`(舊網域 fenix.univ.rzeszow.pl 已死)。逐檔下載 `…/ds/data/fall-01-cam0-rgb.zip`,無打包檔;cam0 RGB 全部約 **4.5GB**。cam0=平行地面側視(用這個)、cam1=天花板俯視;**ADL 只有 cam0**。640×480 @30fps PNG 序列。標註 `urfall-cam0-falls.csv` / `urfall-cam0-adls.csv`:`label ∈ {-1 未躺, 0 跌落中, 1 躺地}`。授權 **CC BY-NC-SA 4.0**(完整資料不進 git或重傳;demo GIF 仍依同授權);引用:Kwolek & Kepski 2014, CMPB, DOI 10.1016/j.cmpb.2014.09.005。Kaggle 鏡像授權標示 Unknown → 只作備援。
 - **Gradio 現行穩定版是 6.x**(6.19.0)→ pin `gradio>=6,<7`;5.x 範例語法在 6 會壞。OpenCV `mp4v` 瀏覽器不可播、pip opencv 無 H.264 encoder → **一律 ffmpeg `-c:v libx264 -pix_fmt yuv420p -movflags +faststart` 重編碼**。
-- **文獻閾值參考**:軀幹傾角 45°(Chen)~60°(Ambianic);bbox 寬高比 >1.0~1.4;kpt conf 門檻 0.15~0.5;GMDCSA 規則法在 URFD:sens 91.67 / **spec 72.50**(ADL 刻意含躺下);PIFR 2025:P 88.8 / R 94.1 / F1 91.4;CNN 上限 Núñez-Marcos 2017 acc 98.63。**arXiv 2503.19501 已撤稿,不得引用**。像素閾值不可跨解析度遷移 → 一律用軀幹長正規化。
+- **文獻閾值參考**:軀幹傾角 45°(Chen)~60°(Ambianic);bbox 寬高比 >1.0~1.4;kpt conf 門檻 0.15~0.5;Alam et al. MoveNet 規則法在 URFD:sens 91.67 / **spec 72.50**(ADL 刻意含躺下);PIFR 2025:P 88.8 / R 94.1 / F1 91.4;Núñez-Marcos 2017 在 URFD:sens 100 / spec 92 / acc 95。**arXiv 2503.19501 已撤稿,不得引用**。像素閾值不可跨解析度遷移 → 一律用軀幹長正規化。
 
 ## 執行模型(Colab 協作迴圈)
 
@@ -106,7 +106,7 @@ UPRIGHT ─(v>v_fall_enter 或 dθ/dt>omega_enter)→ FALLING ─(躺姿 2-of-3 
    ▲            └(t_falling_timeout 內未確認 → 回退,不出事件:擋快速坐下/蹲下)
    └──(θ<θ_exit 且 h_hip>exit 持續 t_recover;遲滯 exit<enter)──┘
 ```
-躺姿投票 = `[θ>60°, r>1.0, h_hip<0.5]` 三取二(單一特徵各有失效視角,GMDCSA 單規則 spec 72.5% 的教訓)。事件 = 進入 FALLEN;起點 = 進 FALLING 幀。
+躺姿投票 = `[θ>60°, r>1.0, h_hip<0.5]` 三取二(單一特徵各有失效視角,Alam et al. 規則法在 URFD spec 72.5% 的教訓)。事件 = 進入 FALLEN;起點 = 進 FALLING 幀。
 **track 縫合**:新 track 與 `track_stitch_window_s` 內消失舊 track 的末 bbox IoU ≥ 0.3 → 繼承 FSM 狀態,事件記 `track_ids:[old,new]`(跌倒瞬間形變大,ByteTrack 常斷 id;在 engine 層做,不魔改 tracker)。
 
 **config.yaml**:全部閾值 + 理由見 [config.yaml](config.yaml)。**現值為文獻起點,最終值由 notebook 03 在 tune split 校準後凍結,校準過程記錄成 config 註解素材。**
@@ -137,7 +137,7 @@ UPRIGHT ─(v>v_fall_enter 或 dθ/dt>omega_enter)→ FALLING ─(躺姿 2-of-3 
 
 ## README 大綱(正體中文)
 
-1. 標題 + 一句話定位(強調工程:規則可解釋、event-level 誠實評估、失敗分析)+ badges → 2. **兩張 demo GIF 並排**(跌倒正確觸發 / ADL 不誤觸——展示不誤觸才是懂 precision 的訊號)→ 3. Results at a Glance 小表 → 4. mermaid 架構圖(含 config.yaml 與 debug JSONL 節點)→ 5. 判斷邏輯(特徵數學 + FSM 圖 + 閾值表連 config)→ 6. Quick Start(Colab badge 連 notebooks)→ 7. 評估(**先協定後數字**;文獻對照表分開放並註明協定不可直比:GMDCSA 62.16、PIFR 91.4、CNN 98.63)→ 8. Benchmark → 9. 失敗分析 → 10. 限制與未來工作(遮擋、多人重疊、鏡頭角度、慢速跌倒、Re-ID、跨資料集泛化、TensorRT 匯出)→ 11. 資料集出處與授權(URFD 引用 + CC BY-NC-SA 聲明、不重散布)→ 12. 結構/License。
+1. 標題 + 一句話定位(強調工程:規則可解釋、event-level 誠實評估、失敗分析)+ badges → 2. **兩張 demo GIF 並排**(跌倒正確觸發 / ADL 不誤觸——展示不誤觸才是懂 precision 的訊號)→ 3. Results at a Glance 小表 → 4. mermaid 架構圖(含 config.yaml 與 debug JSONL 節點)→ 5. 判斷邏輯(特徵數學 + FSM 圖 + 閾值表連 config)→ 6. Quick Start(Colab badge 連 notebooks)→ 7. 評估(**先協定後數字**;文獻對照表分開放並註明協定不可直比:Alam et al. specificity 72.5、PIFR F1 91.4、Núñez-Marcos URFD acc 95)→ 8. Benchmark → 9. 失敗分析 → 10. 限制與未來工作(遮擋、多人重疊、鏡頭角度、慢速跌倒、Re-ID、跨資料集泛化、TensorRT 匯出)→ 11. 資料集出處與授權(URFD 引用 + CC BY-NC-SA 聲明、不重散布完整資料集)→ 12. 結構/License。
 GIF:ffmpeg palettegen 壓 480p <5MB 直接進 git。面試 10 題預判清單當 README 驗收標準(每題都要能指著某節回答)。
 
 ## 里程碑(每個 = git commit,英文訊息)
@@ -155,4 +155,4 @@ GIF:ffmpeg palettegen 壓 480p <5MB 直接進 git。面試 10 題預判清單當
 
 ## 風險與緩解(摘要)
 
-躺地 keypoint dropout(pose 模型偏訓直立人形)→ hold-last TTL + 2-of-3 投票 + merge_gap,失敗分析展示實例。URFD ADL 刻意含躺下 → 速度/角速度作必要觸發,README 引 GMDCSA 設定期望。跌倒瞬間 ByteTrack 斷 id → engine 層縫合 + 專屬單測。`boxes.id`/`keypoints.conf` 為 None → 哨兵值 + guard + 單測鎖死。Colab 斷線/VM 揮發 → Drive 持久化 + 全腳本 idempotent。官方站是小型大學伺服器 → 禮貌下載(retry/backoff/skip-existing),Kaggle 鏡像僅備援。小樣本波動 → 固定 seed 切分進版控 + 樣本數警語。Gradio 6 破壞性變更 → pin `>=6,<7`、不抄 5.x 範例。
+躺地 keypoint dropout(pose 模型偏訓直立人形)→ hold-last TTL + 2-of-3 投票 + merge_gap,失敗分析展示實例。URFD ADL 刻意含躺下 → 速度/角速度作必要觸發,README 引 Alam et al. 設定期望。跌倒瞬間 ByteTrack 斷 id → engine 層縫合 + 專屬單測。`boxes.id`/`keypoints.conf` 為 None → 哨兵值 + guard + 單測鎖死。Colab 斷線/VM 揮發 → Drive 持久化 + 全腳本 idempotent。官方站是小型大學伺服器 → 禮貌下載(retry/backoff/skip-existing),Kaggle 鏡像僅備援。小樣本波動 → 固定 seed 切分進版控 + 樣本數警語。Gradio 6 破壞性變更 → pin `>=6,<7`、不抄 5.x 範例。

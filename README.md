@@ -29,6 +29,10 @@
 螢幕錄影:`fall-06`(tune split)展示跌倒正確觸發紅色 ALARM 橫幅;`adl-01`(test split)
 展示日常動作(過程中甚至有蹲下這種容易與跌倒混淆的姿勢)全程正確保持 UPRIGHT、不誤觸。
 
+*影片來源：[UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html)
+`fall-06` 與 `adl-01`。這兩個派生 GIF 不屬於本專案的 MIT 程式碼授權，
+仍依 CC BY-NC-SA 4.0 以非商業作品集示範用途收錄。*
+
 ## 一眼看重點（At a glance）
 
 | 指標 | 結果 |
@@ -67,11 +71,11 @@ repository URL，再開啟下表任一 notebook。將 HTTPS clone URL 貼到第�
 uv sync                              # 核心依賴(規則引擎、評估,無 torch)
 uv run pytest                        # 86 個單元測試,秒級,無需 GPU
 uv run ruff check .                  # Python 原始碼與測試靜態檢查
-pip install -e ".[infer,demo]"       # 加裝推論(ultralytics/opencv)與 Gradio demo
+uv sync --locked --extra infer --extra demo  # 加裝推論與 Gradio demo
 
-fdp pipeline --source video.mp4 --out-dir outputs/   # extract → detect → annotate 一條龍
-fdp bench --video video.mp4 --model yolo26n-pose.pt --model yolo26s-pose.pt
-python -m fall_detection.app.gradio_app --no-share    # 本機跑 demo(不建立公開連結)
+uv run fdp pipeline --source video.mp4 --out-dir outputs/  # extract → detect → annotate
+uv run fdp bench --video video.mp4 --model yolo26n-pose.pt --model yolo26s-pose.pt
+uv run python -m fall_detection.app.gradio_app --no-share  # 不建立公開連結
 ```
 
 ## 架構
@@ -149,7 +153,8 @@ FALLEN/FALLING 中 track 消失或影片結束 ──▶ 仍收尾成一次事�
 
 躺姿投票取 `[θ > theta_lying_enter, r > r_lying, h_hip < h_hip_lying]` **三取二**:
 單一幾何特徵在特定視角都會失效(朝鏡頭跌倒時 r 可能不變、側躺時 θ 不到 90°),
-投票機制吸收單一特徵的盲區(GMDCSA 單規則法在 URFD specificity 僅 72.5% 的教訓)。
+投票機制吸收單一特徵的盲區(Alam et al. MoveNet 規則法在 URFD
+specificity 僅 72.5% 的教訓)。
 
 **收尾規則(`finalize()`)**——track 消失或影片結束時:已在 ALARM 直接收尾;卡在
 FALLEN(躺姿已投票確認,但撐不滿 `t_confirm_fallen_s`)也收尾成一次事件;卡在
@@ -205,12 +210,14 @@ FALLING 但最後一次平滑觀測已符合躺姿投票同樣收尾。三者背
 
 **與文獻數字的對照**(僅供量級參考,見下方注意事項):
 
-| 方法 | Precision | Recall / Sensitivity | F1 |
-|---|---|---|---|
-| 本專案(yolo26n-pose,test split) | 0.600 | 0.600 | 0.600 |
-| GMDCSA(規則法,URFD) | — | 91.67 | —(specificity 72.50) |
-| PIFR(2025) | 88.8 | 94.1 | 91.4 |
-| Núñez-Marcos et al. 2017(CNN,需訓練) | — | — | acc 98.63 |
+| 方法 | Precision | Recall / Sensitivity | F1 | 其他報告指標 |
+|---|---:|---:|---:|---:|
+| 本專案(yolo26n-pose,test split) | 0.600 | 0.600 | 0.600 | specificity 0.741 |
+| [Alam et al. 2024](https://arxiv.org/abs/2401.01587)(MoveNet 規則法,URFD) | 0.667 | 0.917 | — | specificity 0.725 |
+| [PIFR(2025)](https://doi.org/10.1371/journal.pone.0325253) | 0.888 | 0.941 | 0.914 | specificity 0.956 |
+| [Núñez-Marcos et al. 2017](https://doi.org/10.1155/2017/9474806)(CNN,URFD) | — | 1.000 | — | specificity 0.920; accuracy 0.950 |
+
+Alam et al. 表 5 的 F1 報告值與同表 precision/recall 數學上不一致，因此不在上表重複該值。
 
 **這張表不是拿來宣稱贏過或輸給誰**——各方法的評估協定(事件配對容忍窗、
 正類定義、有沒有 tune/test 切分)、資料前處理都不同,數字量級不同不代表方法
@@ -337,7 +344,8 @@ fall-detection-pose/
 ## 資料集聲明
 
 評估使用 [UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html)
-(CC BY-NC-SA 4.0,**不隨本 repo 散布**,由下載腳本自官方站取得):
+(CC BY-NC-SA 4.0；**完整資料集不隨本 repo 散布**，由下載腳本自官方站取得。
+`assets/demo_*.gif` 是上述資料的小型派生示範，不在 MIT 授權範圍內):
 
 > Bogdan Kwolek, Michal Kepski, "Human fall detection on embedded platform using
 > depth maps and wireless accelerometer", *Computer Methods and Programs in
@@ -346,4 +354,4 @@ fall-detection-pose/
 
 ## License
 
-程式碼採 [MIT](LICENSE);資料集授權見上。
+程式碼採 [MIT](LICENSE)；URFD 與由其派生的 demo GIF 授權見上。

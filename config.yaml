@@ -24,7 +24,7 @@ model:
   iou: 0.5                # 追蹤關聯用;單人場景不敏感,保持官方預設
   tracker: bytetrack.yaml # Ultralytics 內建 ByteTrack
   kpt_conf_min: 0.25      # tune split 網格調參結果(候選 [0.15,0.25,0.35],非邊界值)。
-                          # 文獻範圍 0.15(Ambianic)~0.5(GMDCSA),0.25 偏寬鬆一端:保留更多關鍵點,
+                          # 文獻範圍 0.15(Ambianic)~0.5(Alam et al. 2024),0.25 偏寬鬆一端:保留更多關鍵點,
                           # 躺地時較不易因掉點而漏判(呼應躺姿 keypoint dropout 是已知風險)
 
 rules:
@@ -49,7 +49,7 @@ rules:
                             # (未納入網格)
   h_hip_upright_exit: 1.0   # 回正需髖明顯高於踝,與 theta_upright_exit 同為遲滯出口
   posture_votes_required: 2 # 躺姿證據 [θ, r, h_hip] 三取二:單一幾何特徵各有失效視角
-                            # (GMDCSA 單規則法在 URFD specificity 僅 72.5% 的教訓)
+                            # (Alam et al. MoveNet 規則法在 URFD specificity 僅 72.5% 的教訓)
   window_confirm_s: 0.4     # tune split 網格調參結果(候選 [0.15,0.25,0.4]),勝出值等於原始文獻起點值。
                             # 這輪新增這個維度是因為失敗分析發現部分跌倒 track 在投票視窗還沒跑完前
                             # 就消失(見 state_machine.finalize 的結構性修正:最後一次觀測已符合躺姿

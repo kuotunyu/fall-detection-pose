@@ -103,8 +103,7 @@ def build_demo(config_path: str = "config.yaml", example_videos: list[str] | Non
             "YOLO26-pose + ByteTrack + 規則式狀態機(不訓練模型,純規則引擎判定)。"
             "上傳一支影片,輸出標註影片(骨架 + track id + 狀態 + ALARM 橫幅)與"
             "偵測到的跌倒事件表。首次執行需下載模型權重,請稍候。\n\n"
-            "評估協定、閾值理由、失敗案例分析見 "
-            "[GitHub repo](https://github.com/kuotunyu/fall-detection-pose)。"
+            "評估協定、閾值理由與失敗案例分析均收錄於專案 README。"
         )
         with gr.Row():
             with gr.Column():

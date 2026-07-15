@@ -6,7 +6,7 @@
 import numpy as np
 import pandas as pd
 
-from fall_detection.io.cache import CACHE_COLUMNS, N_KPTS
+from fall_detection.io.cache import CACHE_COLUMNS
 from fall_detection.rules import run_engine
 
 from synthetic import (

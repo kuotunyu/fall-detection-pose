@@ -2,7 +2,6 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kuotunyu/fall-detection-pose/blob/main/notebooks/05_gradio_demo.ipynb)
 
 以 **YOLO26-pose 預訓練模型 + ByteTrack 多目標追蹤**為基礎的規則式(rule-based)跌倒偵測系統。
 本專案重點不在模型創新,而在工程能力:
@@ -30,16 +29,17 @@
 
 ## 快速開始
 
-**在瀏覽器裡試(不用裝任何東西)**:點下表任一 notebook 的 Colab 徽章,
-`Runtime → Run all`——每一本都是自包含的(clone repo、裝依賴、跑單元測試)。
+**在瀏覽器裡試(不用本機安裝)**:從 Colab 的 GitHub 分頁貼上本專案發布後的
+repository URL，再開啟下表任一 notebook。將 HTTPS clone URL 貼到第一格的
+`REPOSITORY_URL` 後執行 `Runtime → Run all`；每一本都會 clone repo、安裝依賴並跑單元測試。
 
-| Notebook | 內容 | |
-|---|---|---|
-| `01_smoke_test.ipynb` | 2 支短片(1 fall + 1 ADL)端到端煙測 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kuotunyu/fall-detection-pose/blob/main/notebooks/01_smoke_test.ipynb) |
-| `02_extract_urfd.ipynb` | URFD 全量下載 + 兩模型抽 keypoint cache【唯一需要 GPU 的步驟】 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kuotunyu/fall-detection-pose/blob/main/notebooks/02_extract_urfd.ipynb) |
-| `03_tune_eval.ipynb` | tune split 網格調參 → 凍結 config → test split 定稿 + 失敗分析 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kuotunyu/fall-detection-pose/blob/main/notebooks/03_tune_eval.ipynb) |
-| `04_benchmark.ipynb` | FPS/延遲 benchmark 矩陣 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kuotunyu/fall-detection-pose/blob/main/notebooks/04_benchmark.ipynb) |
-| `05_gradio_demo.ipynb` | 啟動 Gradio demo(上方兩張 GIF 就是這樣錄的) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kuotunyu/fall-detection-pose/blob/main/notebooks/05_gradio_demo.ipynb) |
+| Notebook | 內容 |
+|---|---|
+| [`01_smoke_test.ipynb`](notebooks/01_smoke_test.ipynb) | 2 支短片(1 fall + 1 ADL)端到端煙測 |
+| [`02_extract_urfd.ipynb`](notebooks/02_extract_urfd.ipynb) | URFD 全量下載 + 兩模型抽 keypoint cache【唯一需要 GPU 的步驟】 |
+| [`03_tune_eval.ipynb`](notebooks/03_tune_eval.ipynb) | tune split 網格調參 → 凍結 config → test split 定稿 + 失敗分析 |
+| [`04_benchmark.ipynb`](notebooks/04_benchmark.ipynb) | FPS/延遲 benchmark 矩陣 |
+| [`05_gradio_demo.ipynb`](notebooks/05_gradio_demo.ipynb) | 啟動 Gradio demo(上方兩張 GIF 就是這樣錄的) |
 
 **本機 CLI**(`detect` 只吃 keypoint cache,無需 GPU/`[infer]`;`extract`/`annotate`/`bench`
 需要 `[infer]`,其中 `extract` 建議上 GPU):
@@ -47,6 +47,7 @@
 ```bash
 uv sync                              # 核心依賴(規則引擎、評估,無 torch)
 uv run pytest                        # 86 個單元測試,秒級,無需 GPU
+uv run ruff check .                  # Python 原始碼與測試靜態檢查
 pip install -e ".[infer,demo]"       # 加裝推論(ultralytics/opencv)與 Gradio demo
 
 fdp pipeline --source video.mp4 --out-dir outputs/   # extract → detect → annotate 一條龍

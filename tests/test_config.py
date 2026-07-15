@@ -4,7 +4,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from fall_detection.config import Config, load_config
+from fall_detection.config import Config
 
 from conftest import REPO_ROOT
 

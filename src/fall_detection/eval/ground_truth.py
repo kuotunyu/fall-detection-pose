@@ -53,7 +53,6 @@ def gt_interval(labels: pd.DataFrame) -> tuple[int, int] | None:
 
     start = zero_idx[0]
     # 找 0 之後第一個 1,再走到該連續 1 區段結束
-    i = start
     first_one = None
     for j in range(start, len(lab)):
         if lab[j] == 1:

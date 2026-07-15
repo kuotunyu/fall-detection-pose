@@ -1,7 +1,5 @@
 """Event-level 配對、指標與 URFD GT 解析的測試。"""
 
-import io
-
 import pandas as pd
 
 from fall_detection.eval.ground_truth import gt_interval, load_gt_events

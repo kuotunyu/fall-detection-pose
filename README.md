@@ -11,9 +11,7 @@
 
 FallSense 以 **YOLO26-pose** 擷取人體姿態、**ByteTrack** 延續 Track ID，再由可解釋的有限狀態機（UPRIGHT → FALLING → FALLEN → ALARM）判定跌倒事件。每次警示都保留事件時間、Track ID 與 `rules_fired`，讓結果不只回答「有沒有跌倒」，也能說明「為什麼觸發」。
 
-[Demo](#demo) · [快速開始](#快速開始) · [系統架構](#系統架構) · [評估結果](#評估結果) · [失敗分析](#失敗分析failure-analysis) · [已知限制](#已知限制)
-
-## 實測重點
+## 驗證摘要
 
 | Test event-level F1 | ADL specificity | T4 · yolo26n FP16 | 2-vCPU · yolo26n | Offline tests |
 | ---: | ---: | ---: | ---: | ---: |
@@ -42,14 +40,14 @@ FallSense 以 **YOLO26-pose** 擷取人體姿態、**ByteTrack** 延續 Track ID
 
 </details>
 
-展示媒體由 Gradio 介面實際執行完整 pipeline 擷取，不是手工繪製的 mockup。影片來源為 [UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html)，適用條款見 [Third-party notices](THIRD_PARTY_NOTICES.md)。
+展示媒體皆由 Gradio 介面實際執行完整 pipeline 後擷取。影片來源為 [UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html)，適用條款見 [Third-party notices](THIRD_PARTY_NOTICES.md)。
 
-## 為什麼這個專案值得看
+## 工程設計重點
 
 - **可追溯的決策**：閾值集中於 [`config.yaml`](config.yaml)，事件輸出同時記錄 `rules_fired`、時間與 Track ID。
 - **推論與規則解耦**：GPU 姿態推論只需執行一次並寫入 Keypoint Cache；調參、狀態判定與事件評估可直接在 CPU 重跑。
 - **事件層級評估**：採用明確的一對一事件配對，而不是只報告 frame-level accuracy；ADL 中的任何預測都會計為 FP。
-- **公開失敗證據**：不只列出 Precision、Recall 與 F1，也分析追蹤中斷、主動臥床及重複事件等具體失敗模式。
+- **失敗模式分析**：除 Precision、Recall 與 F1 外，也分析追蹤中斷、主動臥床及重複事件等具體案例。
 - **可重現工程流程**：`uv.lock` 鎖定依賴，GitHub Actions 在 Python 3.10／3.12 執行 Ruff 與 118 項 offline tests。
 
 ## 快速開始
@@ -200,7 +198,7 @@ Benchmark 使用 URFD `adl-01` 重建的 640×480、30 FPS 影片。該影片實
 - **`adl-34`（FP）**：受測者主動躺下再坐起。幾何上確實形成持續躺姿，但依 ADL 的 0-GT 協定仍計為 FP，顯示單靠姿態難以區分「主動臥床」與「意外跌倒」。
 - **`fall-08`（重複預測 FP）**：真實跌倒期間 Track ID 斷裂；第一段已正確配對，第二段再次觸發成為未配對預測，揭示 track stitching 與 event merging 的邊界問題。
 
-公開這些案例的目的不是替指標辯護，而是界定系統目前能可靠處理與尚未處理的問題。
+這些案例界定了系統目前的適用邊界，也指出後續應優先改善 track continuity 與 event merging。
 
 ## 已知限制
 
@@ -210,7 +208,8 @@ Benchmark 使用 URFD `adl-01` 重建的 640×480、30 FPS 影片。該影片實
 - 多人嚴重遮擋下的 Track ID 穩定性與跨資料集 generalization 尚未完成系統性驗證。
 - ONNX／TensorRT 匯出與 edge device 效能不在目前的驗證範圍。
 
-## 重現流程與 Notebooks
+<details>
+<summary><strong>重現流程與 Notebooks</strong></summary>
 
 Notebooks 用於重現開發、校準與評估流程，不是觀看 Demo 的必要步驟。
 
@@ -222,27 +221,7 @@ Notebooks 用於重現開發、校準與評估流程，不是觀看 Demo 的必�
 | [`04_benchmark.ipynb`](notebooks/04_benchmark.ipynb) | GPU／CPU benchmark |
 | [`05_gradio_demo.ipynb`](notebooks/05_gradio_demo.ipynb) | 在 Colab 啟動 Gradio Demo |
 
-## 專案結構
-
-```text
-fall-detection-pose/
-├── src/fall_detection/
-│   ├── app/                      # Gradio Demo 與呈現層
-│   ├── inference/                # YOLO26-pose 與 ByteTrack
-│   ├── rules/                    # 特徵、平滑與狀態機
-│   ├── events/                   # 事件 schema、合併與序列化
-│   ├── eval/                     # 事件配對與指標計算
-│   ├── viz/                      # H.264 標註影片輸出
-│   └── cli.py                    # `fdp` 命令列入口
-├── tests/                        # 118 項 offline tests
-├── notebooks/                    # 重現與評估流程
-├── eval/                         # 切分、指標與失敗分析
-├── assets/                       # README 展示素材
-├── config.yaml                   # 可解釋規則與閾值
-├── bench.json                    # 效能測試原始紀錄
-├── pyproject.toml                # 依賴、CLI 與工具設定
-└── uv.lock                       # 鎖定依賴版本
-```
+</details>
 
 ## 授權與資料來源
 

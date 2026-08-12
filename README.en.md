@@ -11,9 +11,7 @@
 
 FallSense extracts human pose keypoints with **YOLO26-pose**, maintains identities with **ByteTrack**, and detects fall events through an interpretable finite-state machine (UPRIGHT → FALLING → FALLEN → ALARM). Every alert preserves its time interval, Track ID, and `rules_fired`, so the output explains not only *whether* a fall was detected, but *why* it fired.
 
-[Demo](#demo) · [Quick start](#quick-start) · [Architecture](#architecture) · [Evaluation](#evaluation) · [Failure analysis](#failure-analysis) · [Limitations](#known-limitations)
-
-## Key results
+## Evaluation summary
 
 | Test event-level F1 | ADL specificity | T4 · yolo26n FP16 | 2-vCPU · yolo26n | Offline tests |
 | ---: | ---: | ---: | ---: | ---: |
@@ -42,14 +40,14 @@ The interface keeps the annotated video, event interval, Track ID, fired rules, 
 
 </details>
 
-These assets were captured from the real Gradio pipeline; they are not hand-built mockups. The source videos come from the [UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html). See [Third-party notices](THIRD_PARTY_NOTICES.md) for the applicable terms.
+These assets were captured from actual runs of the full Gradio pipeline. The source videos come from the [UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html). See [Third-party notices](THIRD_PARTY_NOTICES.md) for the applicable terms.
 
-## Why this project is different
+## Engineering design
 
 - **Traceable decisions:** thresholds live in [`config.yaml`](config.yaml), while every event records its `rules_fired`, time interval, and Track ID.
 - **Decoupled inference and rules:** GPU pose inference runs once and writes a Keypoint Cache; tuning, state transitions, and event evaluation can then be rerun on CPU.
 - **Event-level evaluation:** the project uses explicit one-to-one event matching instead of reporting frame-level accuracy alone; any event predicted on an ADL video counts as a false positive.
-- **Visible failure evidence:** the repository documents tracker loss, voluntary lying down, and duplicate events—not only Precision, Recall, and F1.
+- **Failure-mode analysis:** beyond Precision, Recall, and F1, the repository examines tracker loss, voluntary lying down, and duplicate-event cases.
 - **Reproducible engineering:** `uv.lock` pins dependencies, and GitHub Actions runs Ruff plus 118 offline tests on Python 3.10 and 3.12.
 
 ## Quick start
@@ -200,7 +198,7 @@ Representative cases identified by reviewing the FP/FN lists in `eval/metrics.js
 - **`adl-34` (FP):** the subject voluntarily lies down and sits back up. The motion forms a sustained lying posture geometrically, but is still an FP under the ADL zero-ground-truth protocol. Pose alone cannot reliably separate intentional lying down from an accidental fall.
 - **`fall-08` (duplicate-prediction FP):** the Track ID breaks during a real fall. The first segment matches the ground-truth event, while the second segment triggers again and remains unmatched, exposing a boundary between track stitching and event merging.
 
-These cases are published to define the system's current operating boundary, not to excuse the headline metric.
+These cases define the system's current operating boundary and identify track continuity and event merging as priorities for further work.
 
 ## Known limitations
 
@@ -210,7 +208,8 @@ These cases are published to define the system's current operating boundary, not
 - Track ID stability under severe multi-person occlusion and cross-dataset generalization have not been evaluated systematically.
 - ONNX/TensorRT export and edge-device performance are outside the current validation scope.
 
-## Reproduction workflow and notebooks
+<details>
+<summary><strong>Reproduction workflow and notebooks</strong></summary>
 
 The notebooks reproduce development, calibration, and evaluation; they are not required to view the demo.
 
@@ -222,27 +221,7 @@ The notebooks reproduce development, calibration, and evaluation; they are not r
 | [`04_benchmark.ipynb`](notebooks/04_benchmark.ipynb) | GPU/CPU benchmark |
 | [`05_gradio_demo.ipynb`](notebooks/05_gradio_demo.ipynb) | Launch the Gradio demo in Colab |
 
-## Repository structure
-
-```text
-fall-detection-pose/
-├── src/fall_detection/
-│   ├── app/                      # Gradio demo and presentation layer
-│   ├── inference/                # YOLO26-pose and ByteTrack
-│   ├── rules/                    # Features, smoothing, and state machine
-│   ├── events/                   # Event schema, merging, and serialization
-│   ├── eval/                     # Event matching and metrics
-│   ├── viz/                      # H.264 annotated-video output
-│   └── cli.py                    # `fdp` command-line entry point
-├── tests/                        # 118 offline tests
-├── notebooks/                    # Reproduction and evaluation workflow
-├── eval/                         # Splits, metrics, and failure analysis
-├── assets/                       # README media
-├── config.yaml                   # Interpretable rules and thresholds
-├── bench.json                    # Raw benchmark record
-├── pyproject.toml                # Dependencies, CLI, and tool configuration
-└── uv.lock                       # Locked dependency graph
-```
+</details>
 
 ## License and dataset
 

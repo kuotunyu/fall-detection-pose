@@ -117,36 +117,140 @@ uv run pytest -q
 
 ## Architecture
 
+FallSense separates one-time GPU inference from the replayable CPU decision pipeline. Model inference, rule tuning, event evaluation, and visualization can therefore be verified independently without rerunning the model after every threshold change.
+
 ```mermaid
-%%{init: {'themeVariables': {'fontSize': '18px'}}}%%
-flowchart TD
-    Video[Input video] --> Pose[YOLO26-pose<br/>17 human keypoints]
-    Pose --> Track[ByteTrack<br/>Track ID]
-    Track --> Cache[(Keypoint Cache<br/>Parquet + metadata)]
-    Cache --> Feature[Temporal and<br/>geometric features]
-    Feature --> FSM[Independent finite-state<br/>machine per track]
-    FSM --> Events[(FallEvent<br/>JSON)]
-    Cache --> Annotate[Annotation renderer]
-    Events --> Annotate
-    Annotate --> Result[H.264 MP4]
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F'}}}%%
+flowchart TB
+    subgraph Interface[Input and interfaces]
+        direction LR
+        Video[Input video] --> Entry[Gradio Demo<br/>or fdp CLI]
+        Config[(config.yaml<br/>traceable thresholds)] --> Entry
+    end
+
+    subgraph Core[Reproducible analysis core]
+        direction LR
+        subgraph GPU[GPU inference · run once]
+            direction TB
+            Pose[YOLO26-pose<br/>17 human keypoints] --> Track[ByteTrack<br/>Track ID association]
+            Track --> Cache[(Keypoint Cache<br/>Parquet + provenance)]
+        end
+
+        subgraph CPU[CPU decision pipeline · replayable]
+            direction TB
+            Feature[Smoothed, normalized<br/>temporal / geometric features] --> FSM[Independent finite-state<br/>machine per track]
+            FSM --> Post[Event merging<br/>and duration filtering]
+            Post --> Events[(FallEvent<br/>events.json)]
+        end
+
+        Cache --> Feature
+    end
+
+    Entry --> Pose
+    Config --> Feature
+
+    subgraph Evidence[Outputs and validation]
+        direction LR
+        Render[Annotated H.264 MP4<br/>Skeleton · Track ID · state]
+        Eval[Frozen test split · event-level evaluation<br/>Precision · Recall · F1 · Failure Analysis]
+    end
+
+    Cache --> Render
+    Events --> Render
+    Video --> Render
+    Cache --> Eval
+    Events --> Eval
+
+    classDef input fill:#EBE5D9,stroke:#7C715F,stroke-width:1.5px,color:#25342F
+    classDef inference fill:#DCE6EC,stroke:#5E7480,stroke-width:1.5px,color:#21343C
+    classDef cache fill:#EFE2CC,stroke:#8C7452,stroke-width:1.5px,color:#382F23
+    classDef decision fill:#DDE8E2,stroke:#587066,stroke-width:1.5px,color:#20352D
+    classDef output fill:#E7DFE8,stroke:#77677A,stroke-width:1.5px,color:#342B36
+    classDef evidence fill:#F0DED9,stroke:#91645B,stroke-width:1.5px,color:#3E2B27
+
+    class Video,Entry,Config input
+    class Pose,Track inference
+    class Cache cache
+    class Feature,FSM,Post decision
+    class Events,Render output
+    class Eval evidence
 ```
 
 The Keypoint Cache is the stable boundary between GPU inference and the CPU rule engine. Its Parquet schema is versioned, while provenance metadata is both embedded in the file and written to a sidecar. Incompatible caches fail fast rather than silently contaminating evaluation results.
 
+### Single-video analysis sequence
+
+This sequence matches the actual call boundaries used by the Demo and `fdp pipeline`. The model produces reusable pose data; the downstream rule engine independently decides whether it constitutes a fall event.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'primaryColor': '#DDE8E2', 'primaryTextColor': '#20352D', 'primaryBorderColor': '#587066', 'lineColor': '#66756F', 'actorBkg': '#EBE5D9', 'actorBorder': '#7C715F', 'actorTextColor': '#25342F', 'signalColor': '#43564F', 'signalTextColor': '#25342F', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
+sequenceDiagram
+    autonumber
+    actor User
+    participant Pipeline as Gradio Demo / CLI
+    participant GPU as Pose + Tracking
+    participant CPU as CPU Decision Pipeline
+
+    User->>Pipeline: Submit clip and model configuration
+    Pipeline->>GPU: extract_video(video, config)
+    loop Each frame
+        GPU->>GPU: YOLO26-pose + ByteTrack
+    end
+    GPU-->>Pipeline: Keypoint Cache<br/>Parquet + provenance metadata
+    Pipeline->>CPU: run_engine(cache, config)
+    loop Each Track ID
+        CPU->>CPU: Feature smoothing → FSM tick → finalize
+    end
+    CPU-->>Pipeline: FallEvent[] + debug records
+    par Render annotated video
+        Pipeline->>Pipeline: annotate_video(...)
+    and Persist auditable evidence
+        Pipeline->>Pipeline: write_events_json(...)
+    end
+    Pipeline-->>User: H.264 MP4 + event summary + events.json
+```
+
 ### Track-level state machine
 
 ```mermaid
-%%{init: {'themeVariables': {'fontSize': '18px'}}}%%
-flowchart LR
-    U[UPRIGHT] -->|v_norm > 0.8<br/>or omega > 90°/s| F[FALLING]
-    F -->|posture vote confirmed| L[FALLEN]
-    F -->|confirmation timeout| U
-    L -->|lying persists >= 0.3 s| A[ALARM]
-    L -->|upright persists| U
-    A -->|upright persists| U
-    F -. track ends with<br/>lying final posture .-> E[(FallEvent)]
-    L -. track ends .-> E
-    A -. recovery or<br/>track ends .-> E
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
+stateDiagram-v2
+    direction TB
+    state "UPRIGHT" as U
+    state "FALLING<br/>rapid motion" as F
+    state "FALLEN<br/>lying confirmed" as L
+    state "ALARM<br/>event confirmed" as A
+    state "FallEvent" as E
+
+    [*] --> U
+    U --> F: v_norm > 0.8<br/>or omega > 90°/s
+    F --> L: lying-posture vote >= 80%
+    F --> U: unconfirmed after 1.2 s<br/>no event emitted
+    L --> A: lying persists >= 0.3 s
+    L --> U: recovery before alarm<br/>no event emitted
+    A --> U: upright persists >= 0.5 s<br/>emit FallEvent
+
+    F --> E: track ends<br/>with a final lying posture
+    L --> E: track ends
+    A --> E: track / video ends
+    E --> [*]
+
+    note right of E
+        Time interval · Track ID chain
+        peak_features · rules_fired
+    end note
+
+    classDef upright fill:#DDE8E2,stroke:#587066,stroke-width:1.5px,color:#20352D
+    classDef falling fill:#EFE2CC,stroke:#8C7452,stroke-width:1.5px,color:#382F23
+    classDef fallen fill:#E7DFE8,stroke:#77677A,stroke-width:1.5px,color:#342B36
+    classDef alarm fill:#F0D8D2,stroke:#A25D50,stroke-width:2px,color:#472923
+    classDef event fill:#DCE6EC,stroke:#5E7480,stroke-width:1.5px,color:#21343C
+
+    class U upright
+    class F falling
+    class L fallen
+    class A alarm
+    class E event
 ```
 
 Each Track ID owns an independent state, so one person cannot trigger another person's event. When a video ends or a track disappears, finalization uses the last state and posture to decide whether an event should be emitted, covering clips that end immediately after a fall.

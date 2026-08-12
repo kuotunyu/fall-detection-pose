@@ -115,36 +115,140 @@ uv run pytest -q
 
 ## 系統架構
 
+FallSense 將一次性的 GPU inference 與可重複執行的 CPU decision pipeline 分開；這讓模型推論、規則調整、事件評估與視覺化可以各自驗證，不必每次改閾值都重新跑模型。
+
 ```mermaid
-%%{init: {'themeVariables': {'fontSize': '18px'}}}%%
-flowchart TD
-    Video[輸入影片] --> Pose[YOLO26-pose<br/>17 個人體關鍵點]
-    Pose --> Track[ByteTrack<br/>Track ID]
-    Track --> Cache[(Keypoint Cache<br/>Parquet + metadata)]
-    Cache --> Feature[時間與幾何特徵]
-    Feature --> FSM[每個 Track 獨立的<br/>有限狀態機]
-    FSM --> Events[(FallEvent<br/>JSON)]
-    Cache --> Annotate[標註輸出]
-    Events --> Annotate
-    Annotate --> Result[H.264 MP4]
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F'}}}%%
+flowchart TB
+    subgraph Interface[輸入與操作介面]
+        direction LR
+        Video[輸入影片] --> Entry[Gradio Demo<br/>或 fdp CLI]
+        Config[(config.yaml<br/>可追溯閾值)] --> Entry
+    end
+
+    subgraph Core[可重現分析核心]
+        direction LR
+        subgraph GPU[GPU inference · 僅執行一次]
+            direction TB
+            Pose[YOLO26-pose<br/>17 個人體關鍵點] --> Track[ByteTrack<br/>Track ID 關聯]
+            Track --> Cache[(Keypoint Cache<br/>Parquet + provenance)]
+        end
+
+        subgraph CPU[CPU decision pipeline · 可重複執行]
+            direction TB
+            Feature[平滑與正規化<br/>時序／幾何特徵] --> FSM[每個 Track 獨立<br/>有限狀態機]
+            FSM --> Post[事件合併<br/>與最短時長過濾]
+            Post --> Events[(FallEvent<br/>events.json)]
+        end
+
+        Cache --> Feature
+    end
+
+    Entry --> Pose
+    Config --> Feature
+
+    subgraph Evidence[輸出與驗證]
+        direction LR
+        Render[標註輸出 · H.264 MP4<br/>骨架 · Track ID · 狀態]
+        Eval[凍結 test split · event-level 評估<br/>Precision · Recall · F1 · Failure Analysis]
+    end
+
+    Cache --> Render
+    Events --> Render
+    Video --> Render
+    Cache --> Eval
+    Events --> Eval
+
+    classDef input fill:#EBE5D9,stroke:#7C715F,stroke-width:1.5px,color:#25342F
+    classDef inference fill:#DCE6EC,stroke:#5E7480,stroke-width:1.5px,color:#21343C
+    classDef cache fill:#EFE2CC,stroke:#8C7452,stroke-width:1.5px,color:#382F23
+    classDef decision fill:#DDE8E2,stroke:#587066,stroke-width:1.5px,color:#20352D
+    classDef output fill:#E7DFE8,stroke:#77677A,stroke-width:1.5px,color:#342B36
+    classDef evidence fill:#F0DED9,stroke:#91645B,stroke-width:1.5px,color:#3E2B27
+
+    class Video,Entry,Config input
+    class Pose,Track inference
+    class Cache cache
+    class Feature,FSM,Post decision
+    class Events,Render output
+    class Eval evidence
 ```
 
 Keypoint Cache 是 GPU inference 與 CPU rule engine 之間的穩定介面。Parquet schema 具有版本檢查，metadata 同時嵌入檔案並寫入 sidecar；不相容的 cache 會 fail fast，避免版本漂移污染評估結果。
 
+### 單次影片分析時序
+
+以下時序對應 Demo 與 `fdp pipeline` 的實際呼叫邊界；模型只負責產生可重用的姿態資料，是否形成事件則由後續規則引擎決定。
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'primaryColor': '#DDE8E2', 'primaryTextColor': '#20352D', 'primaryBorderColor': '#587066', 'lineColor': '#66756F', 'actorBkg': '#EBE5D9', 'actorBorder': '#7C715F', 'actorTextColor': '#25342F', 'signalColor': '#43564F', 'signalTextColor': '#25342F', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
+sequenceDiagram
+    autonumber
+    actor User as 使用者
+    participant Pipeline as Gradio Demo / CLI
+    participant GPU as Pose + Tracking
+    participant CPU as CPU Decision Pipeline
+
+    User->>Pipeline: 提交短片與模型設定
+    Pipeline->>GPU: extract_video(video, config)
+    loop 每個 frame
+        GPU->>GPU: YOLO26-pose + ByteTrack
+    end
+    GPU-->>Pipeline: Keypoint Cache<br/>Parquet + provenance metadata
+    Pipeline->>CPU: run_engine(cache, config)
+    loop 每個 Track ID
+        CPU->>CPU: 特徵平滑 → FSM tick → finalize
+    end
+    CPU-->>Pipeline: FallEvent[] + debug records
+    par 產生標註影片
+        Pipeline->>Pipeline: annotate_video(...)
+    and 保存可稽核證據
+        Pipeline->>Pipeline: write_events_json(...)
+    end
+    Pipeline-->>User: H.264 MP4 + 事件摘要 + events.json
+```
+
 ### Track-level 狀態機
 
 ```mermaid
-%%{init: {'themeVariables': {'fontSize': '18px'}}}%%
-flowchart LR
-    U[UPRIGHT] -->|v_norm > 0.8<br/>或 omega > 90°/s| F[FALLING]
-    F -->|躺姿投票確認| L[FALLEN]
-    F -->|逾時未確認| U
-    L -->|持續躺姿 >= 0.3 s| A[ALARM]
-    L -->|持續回正| U
-    A -->|持續回正| U
-    F -. track 結束且<br/>末幀為躺姿 .-> E[(FallEvent)]
-    L -. track 結束 .-> E
-    A -. recovery 或<br/>track 結束 .-> E
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
+stateDiagram-v2
+    direction TB
+    state "UPRIGHT" as U
+    state "FALLING<br/>快速運動" as F
+    state "FALLEN<br/>躺姿確認" as L
+    state "ALARM<br/>事件成立" as A
+    state "FallEvent" as E
+
+    [*] --> U
+    U --> F: v_norm > 0.8<br/>或 omega > 90°/s
+    F --> L: 躺姿投票 >= 80%
+    F --> U: 1.2 s 內未確認<br/>不輸出事件
+    L --> A: 躺姿持續 >= 0.3 s
+    L --> U: 警示前持續回正<br/>不輸出事件
+    A --> U: 回正持續 >= 0.5 s<br/>輸出 FallEvent
+
+    F --> E: track 結束<br/>且末次姿態為躺姿
+    L --> E: track 結束
+    A --> E: track / 影片結束
+    E --> [*]
+
+    note right of E
+        時間區間 · Track ID 鏈
+        peak_features · rules_fired
+    end note
+
+    classDef upright fill:#DDE8E2,stroke:#587066,stroke-width:1.5px,color:#20352D
+    classDef falling fill:#EFE2CC,stroke:#8C7452,stroke-width:1.5px,color:#382F23
+    classDef fallen fill:#E7DFE8,stroke:#77677A,stroke-width:1.5px,color:#342B36
+    classDef alarm fill:#F0D8D2,stroke:#A25D50,stroke-width:2px,color:#472923
+    classDef event fill:#DCE6EC,stroke:#5E7480,stroke-width:1.5px,color:#21343C
+
+    class U upright
+    class F falling
+    class L fallen
+    class A alarm
+    class E event
 ```
 
 每個 Track ID 都有獨立狀態，不會因另一個人觸發警示而共用事件。影片結束或 track 消失時，finalization 會依最後狀態決定是否輸出事件，處理跌倒後片段立即結束的情況。

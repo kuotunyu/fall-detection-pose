@@ -2,6 +2,8 @@
 
 from types import SimpleNamespace
 
+from synthetic import make_trajectory
+
 from fall_detection.eval.report import (
     _apply_params,
     build_video_dicts,
@@ -10,8 +12,6 @@ from fall_detection.eval.report import (
     make_param_grid,
     select_best,
 )
-
-from synthetic import make_trajectory
 
 FPS = 30.0
 

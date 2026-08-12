@@ -1,6 +1,11 @@
 """tune/test 切分邏輯的測試(純 Python,不碰網路/資料)。"""
 
-from fall_detection.eval.splits import generate_splits, load_splits, save_splits, split_of
+from fall_detection.eval.splits import (
+    generate_splits,
+    load_splits,
+    save_splits,
+    split_of,
+)
 from fall_detection.io.urfd import adl_sequences, fall_sequences
 
 

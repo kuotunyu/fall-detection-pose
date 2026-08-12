@@ -48,7 +48,7 @@ class RulesConfig(BaseModel):
     track_stitch_window_falling_s: float = Field(gt=0.0)
 
     @model_validator(mode="after")
-    def _check_consistency(self) -> "RulesConfig":
+    def _check_consistency(self) -> RulesConfig:
         if self.theta_upright_exit >= self.theta_lying_enter:
             raise ValueError(
                 "theta_upright_exit 必須小於 theta_lying_enter(遲滯出口需低於進入閾值)"

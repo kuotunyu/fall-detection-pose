@@ -2,11 +2,10 @@
 
 import pytest
 import yaml
+from conftest import REPO_ROOT
 from pydantic import ValidationError
 
 from fall_detection.config import Config
-
-from conftest import REPO_ROOT
 
 
 def test_repo_config_loads(cfg):

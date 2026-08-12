@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from synthetic import make_trajectory
 
 from fall_detection.io.cache import (
     SCHEMA_VERSION,
@@ -11,26 +12,24 @@ from fall_detection.io.cache import (
     write_cache,
 )
 
-from synthetic import make_trajectory
-
 
 def _meta(**overrides) -> CacheMeta:
-    base = dict(
-        schema_version=SCHEMA_VERSION,
-        video_path="dummy.mp4",
-        video_sha1="0" * 40,
-        fps=30.0,
-        width=640,
-        height=480,
-        n_frames=168,
-        model_name="yolo26n-pose.pt",
-        ultralytics_version="8.4.x",
-        tracker_yaml="bytetrack.yaml",
-        conf=0.25,
-        iou=0.5,
-        device="cuda:0",
-        git_commit="abc1234",
-    )
+    base = {
+        "schema_version": SCHEMA_VERSION,
+        "video_path": "dummy.mp4",
+        "video_sha1": "0" * 40,
+        "fps": 30.0,
+        "width": 640,
+        "height": 480,
+        "n_frames": 168,
+        "model_name": "yolo26n-pose.pt",
+        "ultralytics_version": "8.4.x",
+        "tracker_yaml": "bytetrack.yaml",
+        "conf": 0.25,
+        "iou": 0.5,
+        "device": "cuda:0",
+        "git_commit": "abc1234",
+    }
     base.update(overrides)
     return CacheMeta(**base)
 

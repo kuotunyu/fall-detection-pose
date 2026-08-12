@@ -4,9 +4,27 @@ from fall_detection.rules.state_machine import FallStateMachine, State, TickInpu
 
 DT = 1.0 / 30.0
 
-UPRIGHT_KW = dict(theta_deg=5.0, bbox_aspect=0.4, h_hip=1.8, v_norm=0.0, omega=0.0)
-LYING_KW = dict(theta_deg=85.0, bbox_aspect=2.5, h_hip=0.1, v_norm=0.2, omega=0.0)
-SIT_KW = dict(theta_deg=20.0, bbox_aspect=0.6, h_hip=0.9, v_norm=0.0, omega=0.0)
+UPRIGHT_KW = {
+    "theta_deg": 5.0,
+    "bbox_aspect": 0.4,
+    "h_hip": 1.8,
+    "v_norm": 0.0,
+    "omega": 0.0,
+}
+LYING_KW = {
+    "theta_deg": 85.0,
+    "bbox_aspect": 2.5,
+    "h_hip": 0.1,
+    "v_norm": 0.2,
+    "omega": 0.0,
+}
+SIT_KW = {
+    "theta_deg": 20.0,
+    "bbox_aspect": 0.6,
+    "h_hip": 0.9,
+    "v_norm": 0.0,
+    "omega": 0.0,
+}
 
 
 def _feed(fsm, t0, dur, frame0, **kw):
@@ -198,7 +216,7 @@ def test_none_inputs_do_not_trigger_or_crash(cfg):
 
 
 def test_adopt_records_track_chain(cfg):
-    fsm, t, f = _fall_to_alarm(cfg)
+    fsm, _t, _f = _fall_to_alarm(cfg)
     fsm.adopt(7)
     events = fsm.finalize()
     assert events[0].track_ids == [1, 7]

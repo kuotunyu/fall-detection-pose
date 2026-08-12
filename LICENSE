@@ -19,12 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Note: This license covers the source code only. The UR Fall Detection Dataset
-(URFD) used for evaluation is licensed under CC BY-NC-SA 4.0 by its authors
-(Kwolek & Kepski, University of Rzeszow). The complete dataset is NOT
-distributed with this repository. The two derived demo GIFs in assets/ are
-excluded from the MIT license and remain subject to the URFD license. See the
-README for attribution, the required citation, and the official download page.

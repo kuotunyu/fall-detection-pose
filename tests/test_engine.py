@@ -5,16 +5,15 @@
 
 import numpy as np
 import pandas as pd
-
-from fall_detection.io.cache import CACHE_COLUMNS
-from fall_detection.rules import run_engine
-
 from synthetic import (
     drop_keypoints,
     make_trajectory,
     scale_coords,
     switch_track,
 )
+
+from fall_detection.io.cache import CACHE_COLUMNS
+from fall_detection.rules import run_engine
 
 FPS = 30.0
 

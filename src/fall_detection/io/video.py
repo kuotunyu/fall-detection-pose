@@ -12,12 +12,13 @@ import os
 import subprocess
 import tempfile
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 import cv2
 import numpy as np
+from typing_extensions import Self
 
 
 @dataclass
@@ -113,7 +114,7 @@ class H264VideoWriter:
                         raise
                     time.sleep(0.05 * (attempt + 1))
 
-    def __enter__(self) -> "H264VideoWriter":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc) -> None:

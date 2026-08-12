@@ -63,8 +63,7 @@ def download_file(
             with requests.get(url, stream=True, timeout=timeout_s) as resp:
                 resp.raise_for_status()
                 with open(part, "wb") as f:
-                    for chunk in resp.iter_content(chunk_size=1 << 20):
-                        f.write(chunk)
+                    f.writelines(resp.iter_content(chunk_size=1 << 20))
             part.replace(dst)
             return dst
         except Exception as e:  # noqa: BLE001 - 重試涵蓋網路層各種錯誤

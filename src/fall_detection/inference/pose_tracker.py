@@ -108,14 +108,14 @@ class PoseTracker:
         """組出 ``model.track()`` 的關鍵字參數(benchmark 需要直接呼叫底層
         ``model.track()`` 以量測純推論延遲,不能只靠 :meth:`track_frame`,
         避免同一幀被 ``persist=True`` 的 tracker 吃兩次而弄亂 track 狀態)。"""
-        return dict(
-            persist=True,
-            tracker=self.tracker_yaml,
-            conf=self.conf,
-            iou=self.iou,
-            device=self.device,
-            verbose=False,
-        )
+        return {
+            "persist": True,
+            "tracker": self.tracker_yaml,
+            "conf": self.conf,
+            "iou": self.iou,
+            "device": self.device,
+            "verbose": False,
+        }
 
     def track_frame(self, frame_bgr: np.ndarray, frame_idx: int) -> FrameDetections:
         """對單一幀執行 pose 推論 + 追蹤;回傳純 numpy 結果。"""

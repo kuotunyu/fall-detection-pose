@@ -3,10 +3,9 @@
 import math
 
 import numpy as np
+from synthetic import LIE, SIT, STAND
 
 from fall_detection.rules.features import compute_frame_geometry
-
-from synthetic import LIE, SIT, STAND
 
 
 def _geo(pose, L=100.0, conf=0.9, bbox=None, conf_min=0.35):

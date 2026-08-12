@@ -25,8 +25,7 @@ def _write_debug_jsonl(path: str | Path, records: list[dict]) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        for rec in records:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        f.writelines(json.dumps(rec, ensure_ascii=False) + "\n" for rec in records)
 
 
 def _run_rules(cache_path: str, config_path: str, collect_debug: bool):
@@ -67,7 +66,7 @@ def cmd_detect(args: argparse.Namespace) -> int:
     """cache → events.json;--debug 另存 per-frame 特徵 JSONL(失敗分析用)。"""
     from .events.schema import write_events_json
 
-    cfg, _, meta, events, debug = _run_rules(args.cache, args.config, args.debug is not None)
+    _cfg, _, meta, events, debug = _run_rules(args.cache, args.config, args.debug is not None)
     write_events_json(args.out, events, source=meta.video_path, fps=meta.fps)
     if args.debug:
         _write_debug_jsonl(args.debug, debug)

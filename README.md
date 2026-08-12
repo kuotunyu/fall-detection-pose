@@ -193,7 +193,7 @@ uv run fdp pipeline --source input.mp4 --out-dir outputs --config config.yaml
 
 ```text
 fall-detection-pose/
-├── .github/workflows/ci.yml      # GitHub Actions：Ruff + pytest
+├── .github/workflows/ci.yml      # GitHub Actions：Python 3.10／3.12、Ruff、pytest
 ├── src/fall_detection/           # 核心 Python package
 │   ├── app/                      # Gradio Demo 與介面呈現
 │   ├── inference/                # YOLO26-pose 與 ByteTrack
@@ -202,7 +202,7 @@ fall-detection-pose/
 │   ├── viz/                      # 標註影片輸出
 │   └── cli.py                    # `fdp` 命令列入口
 ├── notebooks/                    # Colab smoke test 與評估流程
-├── scripts/                      # 資料下載、評估、benchmark 工具
+├── scripts/                      # Demo 媒體擷取與驗證工具
 ├── tests/                        # Offline unit / integration tests
 ├── eval/                         # 指標、逐片結果與失敗分析
 ├── assets/                       # README 展示素材
@@ -214,6 +214,7 @@ fall-detection-pose/
 
 ## 授權與資料來源
 
-程式碼以 [MIT License](LICENSE) 釋出。
+程式碼以 [MIT License](LICENSE) 釋出；第三方資料與展示素材的適用條款另見
+[Third-party notices](THIRD_PARTY_NOTICES.md)。
 
 評估使用 [UR Fall Detection Dataset](http://fenix.univ.rzeszow.pl/~mkepski/ds/uf.html)。資料集與衍生展示媒體依其原始授權 **CC BY-NC-SA 4.0** 使用，僅限非商業研究與作品集展示；本 repository 不重新散布原始資料，下載腳本會連至官方來源。資料集論文：[Kwolek & Kepski, 2014](https://doi.org/10.1016/j.cmpb.2014.09.005)。

@@ -72,7 +72,7 @@ def _draw_person(
 
 
 def _draw_alarm_banner(frame: np.ndarray, track_ids: list[int]) -> None:
-    h, w = frame.shape[:2]
+    _, w = frame.shape[:2]
     overlay = frame.copy()
     cv2.rectangle(overlay, (0, 0), (w, 46), (0, 0, 220), -1)
     cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)

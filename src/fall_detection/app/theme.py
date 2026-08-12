@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 APP_HEADER_HTML = """
 <div class="fd-shell">
   <nav class="fd-nav" aria-label="專案導覽">

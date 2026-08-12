@@ -10,11 +10,11 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
 from threading import Thread
-from typing import Callable, Iterator
 
 DEFAULT_MODEL_CHOICES = ["yolo26n-pose.pt", "yolo26s-pose.pt"]
 

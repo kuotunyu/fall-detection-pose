@@ -208,44 +208,46 @@ sequenceDiagram
 每個 Track ID 依 `UPRIGHT → FALLING → FALLEN → ALARM` 演進；`FallEvent` 是狀態機完成判定後輸出的可稽核事件紀錄。
 
 ```mermaid
-%%{init: {'theme': 'base', 'htmlLabels': false, 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
-stateDiagram-v2
-    direction TB
-    %% En spaces compensate for GitHub's state-node text metrics.
-    state " UPRIGHT " as UPRIGHT
-    state " FALLING " as FALLING
-    state " FALLEN " as FALLEN
-    state " ALARM " as ALARM
-    state " FallEvent " as FallEvent
-    [*] --> UPRIGHT
-    UPRIGHT --> FALLING: v_norm > 0.8<br/>∨ omega > 90°/s
-    FALLING --> FALLEN: 躺姿投票 >= 80%
-    FALLING --> UPRIGHT: 未確認<br/>t = 1.2 s<br/>不輸出事件
-    FALLEN --> ALARM: 躺姿持續 >= 0.3 s
-    FALLEN --> UPRIGHT: 警示前持續回正<br/>不輸出事件
-    ALARM --> UPRIGHT: 回正持續 >= 0.5 s<br/>輸出 FallEvent
+%%{init: {'theme': 'base', 'htmlLabels': false, 'flowchart': {'nodeSpacing': 55, 'rankSpacing': 70, 'curve': 'basis', 'padding': 18}, 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6'}}}%%
+flowchart TB
+    Start(( ))
+    UPRIGHT["UPRIGHT"]
+    FALLING["FALLING"]
+    FALLEN["FALLEN"]
+    ALARM["ALARM"]
+    FallEvent["FallEvent"]
+    End(( ))
+    Evidence["區間 · Track IDs<br/>特徵峰值 · 觸發規則"]
 
-    FALLING --> FallEvent: track 結束<br/>且末次姿態為躺姿
-    FALLEN --> FallEvent: track 結束
-    ALARM --> FallEvent: track / 影片結束
-    FallEvent --> [*]
+    Start --> UPRIGHT
+    UPRIGHT -->|"v_norm > 0.8<br/>∨ omega > 90°/s"| FALLING
+    FALLING -->|"躺姿投票 >= 80%"| FALLEN
+    FALLING -->|"未確認<br/>t = 1.2 s<br/>不輸出事件"| UPRIGHT
+    FALLEN -->|"躺姿持續 >= 0.3 s"| ALARM
+    FALLEN -->|"警示前持續回正<br/>不輸出事件"| UPRIGHT
+    ALARM -->|"回正持續 >= 0.5 s<br/>輸出 FallEvent"| UPRIGHT
 
-    note right of FallEvent
-        區間 · Track IDs
-        特徵峰值 · 觸發規則
-    end note
+    FALLING -->|"track 結束<br/>且末次姿態為躺姿"| FallEvent
+    FALLEN -->|"track 結束"| FallEvent
+    ALARM -->|"track / 影片結束"| FallEvent
+    FallEvent --> End
+    FallEvent -.-> Evidence
 
     classDef upright fill:#DDE8E2,stroke:#587066,stroke-width:1.5px,color:#20352D
     classDef falling fill:#EFE2CC,stroke:#8C7452,stroke-width:1.5px,color:#382F23
     classDef fallen fill:#E7DFE8,stroke:#77677A,stroke-width:1.5px,color:#342B36
     classDef alarm fill:#F0D8D2,stroke:#A25D50,stroke-width:2px,color:#472923
     classDef event fill:#DCE6EC,stroke:#5E7480,stroke-width:1.5px,color:#21343C
+    classDef endpoint fill:#587066,stroke:#587066,color:#587066
+    classDef evidence fill:#EFE2CC,stroke:#8C7452,stroke-width:1.5px,color:#382F23
 
     class UPRIGHT upright
     class FALLING falling
     class FALLEN fallen
     class ALARM alarm
     class FallEvent event
+    class Start,End endpoint
+    class Evidence evidence
 ```
 
 每個 Track ID 都有獨立狀態，不會因另一個人觸發警示而共用事件。影片結束或 track 消失時，finalization 會依最後狀態決定是否輸出事件，處理跌倒後片段立即結束的情況。

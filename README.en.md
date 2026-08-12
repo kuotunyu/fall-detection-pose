@@ -210,44 +210,46 @@ sequenceDiagram
 Each Track ID progresses through `UPRIGHT → FALLING → FALLEN → ALARM`; `FallEvent` is the auditable event record emitted after the state machine finalizes its decision.
 
 ```mermaid
-%%{init: {'theme': 'base', 'htmlLabels': false, 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
-stateDiagram-v2
-    direction TB
-    %% En spaces compensate for GitHub's state-node text metrics.
-    state " UPRIGHT " as UPRIGHT
-    state " FALLING " as FALLING
-    state " FALLEN " as FALLEN
-    state " ALARM " as ALARM
-    state " FallEvent " as FallEvent
-    [*] --> UPRIGHT
-    UPRIGHT --> FALLING: v_norm > 0.8<br/>or omega > 90°/s
-    FALLING --> FALLEN: lying-posture vote >= 80%
-    FALLING --> UPRIGHT: unconfirmed<br/>at t = 1.2 s<br/>no event
-    FALLEN --> ALARM: lying persists >= 0.3 s
-    FALLEN --> UPRIGHT: recovery before alarm<br/>no event emitted
-    ALARM --> UPRIGHT: upright persists >= 0.5 s<br/>emit FallEvent
+%%{init: {'theme': 'base', 'htmlLabels': false, 'flowchart': {'nodeSpacing': 55, 'rankSpacing': 70, 'curve': 'basis', 'padding': 18}, 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6'}}}%%
+flowchart TB
+    Start(( ))
+    UPRIGHT["UPRIGHT"]
+    FALLING["FALLING"]
+    FALLEN["FALLEN"]
+    ALARM["ALARM"]
+    FallEvent["FallEvent"]
+    End(( ))
+    Evidence["Interval · Track IDs<br/>Peaks · fired rules"]
 
-    FALLING --> FallEvent: track ends<br/>with a final lying posture
-    FALLEN --> FallEvent: track ends
-    ALARM --> FallEvent: track / video ends
-    FallEvent --> [*]
+    Start --> UPRIGHT
+    UPRIGHT -->|"v_norm > 0.8<br/>or omega > 90°/s"| FALLING
+    FALLING -->|"lying-posture vote >= 80%"| FALLEN
+    FALLING -->|"unconfirmed<br/>at t = 1.2 s<br/>no event"| UPRIGHT
+    FALLEN -->|"lying persists >= 0.3 s"| ALARM
+    FALLEN -->|"recovery before alarm<br/>no event emitted"| UPRIGHT
+    ALARM -->|"upright persists >= 0.5 s<br/>emit FallEvent"| UPRIGHT
 
-    note right of FallEvent
-        Interval · Track IDs
-        Peaks · fired rules
-    end note
+    FALLING -->|"track ends<br/>with a final lying posture"| FallEvent
+    FALLEN -->|"track ends"| FallEvent
+    ALARM -->|"track / video ends"| FallEvent
+    FallEvent --> End
+    FallEvent -.-> Evidence
 
     classDef upright fill:#DDE8E2,stroke:#587066,stroke-width:1.5px,color:#20352D
     classDef falling fill:#EFE2CC,stroke:#8C7452,stroke-width:1.5px,color:#382F23
     classDef fallen fill:#E7DFE8,stroke:#77677A,stroke-width:1.5px,color:#342B36
     classDef alarm fill:#F0D8D2,stroke:#A25D50,stroke-width:2px,color:#472923
     classDef event fill:#DCE6EC,stroke:#5E7480,stroke-width:1.5px,color:#21343C
+    classDef endpoint fill:#587066,stroke:#587066,color:#587066
+    classDef evidence fill:#EFE2CC,stroke:#8C7452,stroke-width:1.5px,color:#382F23
 
     class UPRIGHT upright
     class FALLING falling
     class FALLEN fallen
     class ALARM alarm
     class FallEvent event
+    class Start,End endpoint
+    class Evidence evidence
 ```
 
 Each Track ID owns an independent state, so one person cannot trigger another person's event. When a video ends or a track disappears, finalization uses the last state and posture to decide whether an event should be emitted, covering clips that end immediately after a fall.

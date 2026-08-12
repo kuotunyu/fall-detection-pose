@@ -20,3 +20,6 @@ dist/
 
 # 本機設計腦力激盪與視覺 mockup 工作檔
 .superpowers/
+
+# Codex 隔離開發工作樹
+.worktrees/

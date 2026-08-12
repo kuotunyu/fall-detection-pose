@@ -10,10 +10,25 @@
 from __future__ import annotations
 
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from queue import Queue
+from threading import Thread
+from typing import Callable, Iterator
 
 DEFAULT_MODEL_CHOICES = ["yolo26n-pose.pt", "yolo26s-pose.pt"]
+
+
+@dataclass(frozen=True)
+class StreamMessage:
+    """A progress or terminal message emitted by the background analysis."""
+
+    kind: str
+    fraction: float = 0.0
+    description: str = ""
+    annotated_path: str | None = None
+    events_path: str | None = None
+    error: Exception | None = None
 EVENT_TABLE_HEADERS = ["Track ID", "開始時間(s)", "結束時間(s)", "時長(s)", "觸發規則"]
 
 
@@ -30,6 +45,66 @@ def _events_to_rows(events: list[dict]) -> list[list]:
         ]
         for e in events
     ]
+
+
+def _analysis_metadata(df, meta) -> dict[str, int]:
+    """Return stable analysis counts without counting untracked detections."""
+
+    if df.empty or "track_id" not in df:
+        n_tracks = 0
+    else:
+        valid_tracks = df.loc[df["track_id"] >= 0, "track_id"]
+        n_tracks = int(valid_tracks.nunique())
+    return {"n_frames": int(meta.n_frames), "n_tracks": n_tracks}
+
+
+def _stream_process(
+    video_path: str,
+    model_name: str,
+    config_path: str,
+    *,
+    runner: Callable | None = None,
+) -> Iterator[StreamMessage]:
+    """Run inference off the UI thread and yield its progress messages."""
+
+    selected_runner = runner or process_video
+    messages: Queue[StreamMessage] = Queue()
+
+    def on_progress(fraction: float, description: str) -> None:
+        messages.put(
+            StreamMessage(
+                kind="progress",
+                fraction=max(0.0, min(float(fraction), 1.0)),
+                description=str(description),
+            )
+        )
+
+    def worker() -> None:
+        try:
+            annotated_path, _rows, events_path = selected_runner(
+                video_path,
+                model_name,
+                config_path,
+                on_progress=on_progress,
+            )
+            messages.put(
+                StreamMessage(
+                    kind="success",
+                    fraction=1.0,
+                    description="分析完成",
+                    annotated_path=annotated_path,
+                    events_path=events_path,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - forwarded to the safe UI mapper
+            messages.put(StreamMessage(kind="error", error=exc))
+
+    Thread(target=worker, daemon=True).start()
+    while True:
+        message = messages.get()
+        yield message
+        if message.kind in {"success", "error"}:
+            return
 
 
 def process_video(
@@ -86,7 +161,13 @@ def process_video(
     _progress(0.82, "輸出標註影片(H.264 重編碼)…")
     annotate_video(video_path, df, meta.fps, cfg, events, debug, annotated_path)
 
-    write_events_json(events_path, events, source=str(video_path), fps=meta.fps)
+    write_events_json(
+        events_path,
+        events,
+        source=str(video_path),
+        fps=meta.fps,
+        extra=_analysis_metadata(df, meta),
+    )
 
     _progress(1.0, "完成")
     rows = _events_to_rows([e.to_dict() for e in events])

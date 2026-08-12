@@ -7,7 +7,7 @@ APP_HEADER_HTML = """
 <div class="fd-shell">
   <nav class="fd-nav" aria-label="專案導覽">
     <div class="fd-brand"><span>FD</span><strong>Fall Detection / Pose</strong></div>
-    <div><a href="#fd-method">方法</a><a href="#fd-evaluation">評估</a><a href="#fd-limitations">限制</a></div>
+    <div><a href="#fd-method">方法</a><a href="#fd-evaluation">評估</a><a href="#fd-limitations">限制</a><a href="https://github.com/kuotunyu/fall-detection-pose" target="_blank" rel="noopener noreferrer">GitHub ↗</a></div>
   </nav>
   <header class="fd-header" id="fd-method">
     <div>

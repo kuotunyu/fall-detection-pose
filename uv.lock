@@ -581,6 +581,7 @@ plot = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "opencv-python" },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -604,6 +605,7 @@ provides-extras = ["infer", "demo", "plot", "all"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "opencv-python", specifier = ">=4.9" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.11" },
 ]

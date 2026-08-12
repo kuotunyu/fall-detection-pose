@@ -32,7 +32,11 @@ all = ["fall-detection-pose[infer,demo,plot]"]
 fdp = "fall_detection.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.11"]
+dev = [
+    "opencv-python>=4.9",  # tests/test_video_writer.py imports the infer-only video module
+    "pytest>=8",
+    "ruff>=0.11",
+]
 
 [build-system]
 requires = ["hatchling"]

@@ -4,6 +4,8 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 
+[GitHub](https://github.com/kuotunyu) · [Hugging Face](https://huggingface.co/steven0226)
+
 以 **YOLO26-pose 預訓練模型 + ByteTrack 多目標追蹤**為基礎的規則式(rule-based)跌倒偵測系統。
 本專案重點不在模型創新,而在工程能力:
 
@@ -47,7 +49,7 @@
 | Fixed test-split video-level specificity（yolo26n-pose） | **0.741** |
 | T4 FP16 端到端速度（yolo26n-pose） | **64.64 FPS** |
 | 2-vCPU CPU 端到端速度（yolo26n-pose） | **8.23 FPS** |
-| 離線單元測試 | **117 tests** |
+| 離線單元測試 | **118 tests** |
 
 F1 與 specificity 來自固定 test split（20 falls + 27 ADL）；所有閾值只在 tune split
 搜尋，但第一輪 test 指標看過後仍修正了一個事件收尾 bug，再重新評估。因此這是透明的

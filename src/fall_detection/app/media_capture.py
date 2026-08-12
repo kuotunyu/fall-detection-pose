@@ -14,3 +14,11 @@ def parse_viewport(value: str) -> dict[str, int]:
     if width <= 0 or height <= 0:
         raise ValueError("viewport dimensions must be positive")
     return {"width": width, "height": height}
+
+
+def frame_delay_ms(fps: float) -> int:
+    """Return the nearest integer frame delay for a target capture FPS."""
+
+    if fps <= 0:
+        raise ValueError("fps must be positive")
+    return round(1000 / fps)

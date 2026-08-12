@@ -1,6 +1,6 @@
 import pytest
 
-from fall_detection.app.media_capture import parse_viewport
+from fall_detection.app.media_capture import frame_delay_ms, parse_viewport
 
 
 @pytest.mark.parametrize(
@@ -18,3 +18,13 @@ def test_parse_viewport(value, expected):
 def test_parse_viewport_rejects_invalid_sizes(value):
     with pytest.raises(ValueError):
         parse_viewport(value)
+
+
+def test_frame_delay_ms_uses_requested_fps():
+    assert frame_delay_ms(8.0) == 125
+
+
+@pytest.mark.parametrize("fps", [0, -1])
+def test_frame_delay_ms_rejects_nonpositive_fps(fps):
+    with pytest.raises(ValueError):
+        frame_delay_ms(fps)

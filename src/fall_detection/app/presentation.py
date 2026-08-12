@@ -66,7 +66,7 @@ def _escape(value: object) -> str:
     return html.escape(str(value), quote=True)
 
 
-def load_evidence(project_root: str | Path, test_count: int = 86) -> tuple[EvidenceItem, ...]:
+def load_evidence(project_root: str | Path, test_count: int = 117) -> tuple[EvidenceItem, ...]:
     """Load the published test F1 and T4 FP16 benchmark from tracked JSON."""
 
     root = Path(project_root)

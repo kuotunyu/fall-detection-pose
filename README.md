@@ -17,20 +17,26 @@
 
 ## Demo
 
-<table>
-<tr><td align="center"><b>跌倒 → 正確觸發 ALARM</b></td></tr>
-<tr><td align="center"><img src="assets/demo_fall.gif" width="600"></td></tr>
-<tr><td align="center"><b>日常動作(ADL)→ 正確不觸發</b></td></tr>
-<tr><td align="center"><img src="assets/demo_adl.gif" width="600"></td></tr>
-</table>
+介面將標註影片、事件區間、Track ID 與實際 `Rules fired` 放在同一視線範圍；
+沒有事件時則顯示明確的 0 事件結論，不保留空白結果表格。
 
-兩支都是實際跑完整條 pipeline 的畫面(非後製剪輯),用
-[notebooks/05_gradio_demo.ipynb](notebooks/05_gradio_demo.ipynb) 啟動的 Gradio demo 直接
-螢幕錄影:`fall-06`(tune split)展示跌倒正確觸發紅色 ALARM 橫幅;`adl-01`(test split)
-展示日常動作(過程中甚至有蹲下這種容易與跌倒混淆的姿勢)全程正確保持 UPRIGHT、不誤觸。
+<p align="center"><b>fall-06：實際 pipeline 輸出，Track 1 形成 ALARM 事件</b></p>
+<p align="center"><img src="assets/demo_fall.gif" width="1120" alt="fall-06 跌倒事件分析介面"></p>
+
+<p align="center"><b>adl-01：分析 150 影格、追蹤 1 人，未形成跌倒事件</b></p>
+<p align="center"><img src="assets/demo_adl.png" width="1120" alt="adl-01 無跌倒事件分析介面"></p>
+
+<details>
+<summary>手機版結果</summary>
+<p align="center"><img src="assets/demo_mobile.png" width="390" alt="390px 手機版跌倒事件分析介面"></p>
+</details>
+
+以上媒體都由最終 Gradio 介面實際執行完整 pipeline 擷取；`fall-06`(tune split)
+觸發 `v>v_fall_enter`、`posture_vote_confirmed`、`lying_persisted`，`adl-01`
+(test split)輸出 0 個事件。GIF 僅由實際瀏覽器畫面組成，沒有修改推論結果。
 
 *影片來源：[UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html)
-`fall-06` 與 `adl-01`。這兩個派生 GIF 不屬於本專案的 MIT 程式碼授權，
+`fall-06` 與 `adl-01`。這些派生媒體不屬於本專案的 MIT 程式碼授權，
 仍依 CC BY-NC-SA 4.0 以非商業作品集示範用途收錄。*
 
 ## 一眼看重點（At a glance）
@@ -41,20 +47,31 @@
 | Fixed test-split video-level specificity（yolo26n-pose） | **0.741** |
 | T4 FP16 端到端速度（yolo26n-pose） | **64.64 FPS** |
 | 2-vCPU CPU 端到端速度（yolo26n-pose） | **8.23 FPS** |
-| 離線單元測試 | **86 tests** |
+| 離線單元測試 | **117 tests** |
 
 F1 與 specificity 來自固定 test split（20 falls + 27 ADL）；所有閾值只在 tune split
 搜尋，但第一輪 test 指標看過後仍修正了一個事件收尾 bug，再重新評估。因此這是透明的
 post-development estimate，不是 pristine one-shot holdout。速度是單一 150-frame
 `adl-01` 片段各跑 3 次的環境特定 benchmark，不代表所有影片或硬體；完整協定與
 p50/p95 見[評估](#評估)與 [Benchmark](#benchmark)。[CI](.github/workflows/ci.yml)
-只安裝輕量核心與開發依賴，自動執行相同的 86 項測試及 Ruff，不下載模型或安裝 GPU stack。
+只安裝輕量核心與開發依賴，自動執行測試及 Ruff，不下載模型或安裝 GPU stack。
 
 ## 快速開始
 
-**在瀏覽器裡試(不用本機安裝)**:從 Colab 的 GitHub 分頁貼上本專案發布後的
-repository URL，再開啟下表任一 notebook。將 HTTPS clone URL 貼到第一格的
-`REPOSITORY_URL` 後執行 `Runtime → Run all`；每一本都會 clone repo、安裝依賴並跑單元測試。
+**本機 Demo**：安裝鎖定依賴後直接啟動，不需要先操作 notebook。
+
+```bash
+uv sync --locked --extra infer --extra demo
+uv run python -m fall_detection.app.gradio_app --no-share
+```
+
+瀏覽器開啟終端顯示的本機 URL，上傳一段短片後按「開始分析」。介面會依序顯示
+影片解碼、Pose extraction、Event detection 與 Video annotation 的實際進度，
+最後提供標註影片與 `events.json`。
+
+**Colab／完整重現**：下列 notebook 保留給想重跑資料抽取、評估與 benchmark 的讀者，
+不是體驗 Demo 的必要步驟。將 repository 的 HTTPS clone URL 貼到第一格
+`REPOSITORY_URL` 後執行 `Runtime → Run all`。
 
 | Notebook | 內容 |
 |---|---|
@@ -62,14 +79,14 @@ repository URL，再開啟下表任一 notebook。將 HTTPS clone URL 貼到第�
 | [`02_extract_urfd.ipynb`](notebooks/02_extract_urfd.ipynb) | URFD 全量下載 + 兩模型抽 keypoint cache【唯一需要 GPU 的步驟】 |
 | [`03_tune_eval.ipynb`](notebooks/03_tune_eval.ipynb) | tune split 網格調參 → 凍結 config → test split 定稿 + 失敗分析 |
 | [`04_benchmark.ipynb`](notebooks/04_benchmark.ipynb) | FPS/延遲 benchmark 矩陣 |
-| [`05_gradio_demo.ipynb`](notebooks/05_gradio_demo.ipynb) | 啟動 Gradio demo(上方兩張 GIF 就是這樣錄的) |
+| [`05_gradio_demo.ipynb`](notebooks/05_gradio_demo.ipynb) | 在 Colab 啟動同一套 Gradio demo |
 
 **本機 CLI**(`detect` 只吃 keypoint cache,無需 GPU/`[infer]`;`extract`/`annotate`/`bench`
 需要 `[infer]`,其中 `extract` 建議上 GPU):
 
 ```bash
 uv sync                              # 核心依賴(規則引擎、評估,無 torch)
-uv run pytest                        # 86 個單元測試,秒級,無需 GPU
+uv run pytest                        # 離線單元測試,秒級,無需 GPU
 uv run ruff check .                  # Python 原始碼與測試靜態檢查
 uv sync --locked --extra infer --extra demo  # 加裝推論與 Gradio demo
 

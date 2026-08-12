@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from fall_detection.app.media_capture import parse_viewport
+from fall_detection.app.media_capture import frame_delay_ms, parse_viewport
 
 
 def capture(
@@ -59,25 +59,78 @@ def capture(
         browser.close()
 
 
+def capture_result_frames(
+    *,
+    url: str,
+    out_dir: Path,
+    viewport: dict[str, int],
+    video: Path,
+    seconds: float,
+    fps: float,
+    timeout_ms: int,
+) -> None:
+    """Capture a short, crop-stable frame sequence from an actual result video."""
+
+    from playwright.sync_api import sync_playwright
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    delay = frame_delay_ms(fps)
+    frame_count = max(1, round(seconds * fps))
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        page = browser.new_page(viewport=viewport)
+        page.goto(url, wait_until="domcontentloaded")
+        page.locator("#fd-input").first.wait_for(state="visible")
+        page.locator("#fd-input input[type=file]").set_input_files(str(video.resolve()))
+        page.get_by_role("button", name="開始分析").click()
+        page.locator("#fd-result").first.wait_for(state="visible", timeout=timeout_ms)
+        result = page.locator("#fd-result").first
+        output_video = result.locator("video").first
+        output_video.evaluate("video => { video.currentTime = 0; video.muted = true; video.play(); }")
+        for index in range(frame_count):
+            result.screenshot(path=str(out_dir / f"frame-{index:03d}.png"))
+            page.wait_for_timeout(delay)
+        browser.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default="http://127.0.0.1:7863")
-    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--out", type=Path)
     parser.add_argument("--viewport", default="1440x1000")
     parser.add_argument("--video", type=Path)
     parser.add_argument("--timeout-ms", type=int, default=180_000)
     parser.add_argument("--wait-seconds", type=float, default=0.0)
     parser.add_argument("--crop-selector")
+    parser.add_argument("--frames-dir", type=Path)
+    parser.add_argument("--seconds", type=float, default=4.0)
+    parser.add_argument("--fps", type=float, default=8.0)
     args = parser.parse_args()
-    capture(
-        url=args.url,
-        out_path=args.out,
-        viewport=parse_viewport(args.viewport),
-        video=args.video,
-        timeout_ms=args.timeout_ms,
-        wait_seconds=args.wait_seconds,
-        crop_selector=args.crop_selector,
-    )
+    viewport = parse_viewport(args.viewport)
+    if args.frames_dir:
+        if args.video is None:
+            parser.error("--frames-dir requires --video")
+        capture_result_frames(
+            url=args.url,
+            out_dir=args.frames_dir,
+            viewport=viewport,
+            video=args.video,
+            seconds=args.seconds,
+            fps=args.fps,
+            timeout_ms=args.timeout_ms,
+        )
+    else:
+        if args.out is None:
+            parser.error("--out is required unless --frames-dir is used")
+        capture(
+            url=args.url,
+            out_path=args.out,
+            viewport=viewport,
+            video=args.video,
+            timeout_ms=args.timeout_ms,
+            wait_seconds=args.wait_seconds,
+            crop_selector=args.crop_selector,
+        )
 
 
 if __name__ == "__main__":

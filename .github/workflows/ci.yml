@@ -16,7 +16,7 @@ jobs:
         with:
           enable-cache: true
       - name: Install core and development dependencies
-        run: uv sync --locked --group dev
+        run: uv sync --locked --group dev --extra demo
       - name: Lint
         run: uv run ruff check .
       - name: Test

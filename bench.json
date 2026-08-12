@@ -9,7 +9,7 @@
   "gpu": "Tesla T4",
   "cpu": "x86_64",
   "cpu_count": 2,
-  "git_commit": "38667a0",
+  "git_commit": "8b370c2",
   "results": [
     {
       "model_name": "yolo26n-pose.pt",

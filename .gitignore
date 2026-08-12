@@ -1,4 +1,4 @@
-# 資料與產物一律不進 git (URFD 為 CC BY-NC-SA 4.0, 不隨 repo 散布)
+# Downloaded datasets and generated artifacts
 data/
 cache/
 outputs/
@@ -15,22 +15,20 @@ dist/
 *.egg-info/
 .ipynb_checkpoints/
 
-# 環境
+# Secrets
 .env
 
-# Maintainer notes & local workspaces
+# Maintainer notes and local workspaces
 .agents/
 .claude/
 CLAUDE.md
+plan.md
 PLAN.md
 PROGRESS.md
 PROJECT_PLAN.md
 interview*.md
 INTERVIEW_PREP.md
 *.private.md
-
-# 本機設計腦力激盪與視覺 mockup 工作檔
+docs/superpowers/
 .superpowers/
-
-# Codex 隔離開發工作樹
 .worktrees/

@@ -45,7 +45,11 @@ def test_build_video_dicts_fall_and_adl(cfg):
     gt_by_seq = {"fall-01": (60, 90)}  # 幀號隨意,只測試轉換邏輯
 
     videos = build_video_dicts(
-        cache_by_seq, ["fall-01", "adl-01"], adl_seqs={"adl-01"}, gt_by_seq=gt_by_seq, cfg=cfg
+        cache_by_seq,
+        ["fall-01", "adl-01"],
+        adl_seqs={"adl-01"},
+        gt_by_seq=gt_by_seq,
+        cfg=cfg,
     )
     by_name = {v["name"]: v for v in videos}
     assert by_name["fall-01"]["is_adl"] is False
@@ -65,11 +69,29 @@ def test_grid_search_stricter_thresholds_suppress_detection(cfg):
     gt_by_seq = {"fall-01": (60, 165)}
 
     combos = [
-        {"kpt_conf_min": 0.35, "v_fall_enter": 1.5, "theta_lying_enter": 60, "theta_upright_exit": 40, "t_confirm_fallen_s": 1.0},
-        {"kpt_conf_min": 0.35, "v_fall_enter": 10.0, "omega_enter": 10000.0, "theta_lying_enter": 60, "theta_upright_exit": 40, "t_confirm_fallen_s": 1.0},
+        {
+            "kpt_conf_min": 0.35,
+            "v_fall_enter": 1.5,
+            "theta_lying_enter": 60,
+            "theta_upright_exit": 40,
+            "t_confirm_fallen_s": 1.0,
+        },
+        {
+            "kpt_conf_min": 0.35,
+            "v_fall_enter": 10.0,
+            "omega_enter": 10000.0,
+            "theta_lying_enter": 60,
+            "theta_upright_exit": 40,
+            "t_confirm_fallen_s": 1.0,
+        },
     ]
     results = grid_search(
-        cache_by_seq, ["fall-01"], adl_seqs=set(), gt_by_seq=gt_by_seq, base_cfg=cfg, param_combos=combos
+        cache_by_seq,
+        ["fall-01"],
+        adl_seqs=set(),
+        gt_by_seq=gt_by_seq,
+        base_cfg=cfg,
+        param_combos=combos,
     )
     assert len(results) == 2
     recalls = {r["params"]["v_fall_enter"]: r["metrics"]["recall"] for r in results}
@@ -100,12 +122,33 @@ def test_list_failure_cases_identifies_unmatched_intervals():
     metrics = {
         "tol_s": 0.5,
         "per_video": [
-            {"name": "fall-01", "is_adl": False, "tp": 1, "fp": 0, "fn": 0,
-             "preds": [[2.0, 3.0]], "gts": [[2.1, 3.1]]},
-            {"name": "fall-02", "is_adl": False, "tp": 0, "fp": 0, "fn": 1,
-             "preds": [], "gts": [[5.0, 6.0]]},
-            {"name": "adl-05", "is_adl": True, "tp": 0, "fp": 1, "fn": 0,
-             "preds": [[1.0, 2.0]], "gts": []},
+            {
+                "name": "fall-01",
+                "is_adl": False,
+                "tp": 1,
+                "fp": 0,
+                "fn": 0,
+                "preds": [[2.0, 3.0]],
+                "gts": [[2.1, 3.1]],
+            },
+            {
+                "name": "fall-02",
+                "is_adl": False,
+                "tp": 0,
+                "fp": 0,
+                "fn": 1,
+                "preds": [],
+                "gts": [[5.0, 6.0]],
+            },
+            {
+                "name": "adl-05",
+                "is_adl": True,
+                "tp": 0,
+                "fp": 1,
+                "fn": 0,
+                "preds": [[1.0, 2.0]],
+                "gts": [],
+            },
         ],
     }
     out = list_failure_cases(metrics)

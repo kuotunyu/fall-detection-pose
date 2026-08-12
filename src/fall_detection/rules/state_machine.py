@@ -158,12 +158,16 @@ class FallStateMachine:
 
         elif self.state is State.FALLEN:
             if lying_now:
-                self._lying_since = self._lying_since if self._lying_since is not None else x.t_s
+                self._lying_since = (
+                    self._lying_since if self._lying_since is not None else x.t_s
+                )
                 self._not_lying_since = None
             else:
                 self._lying_since = None
                 self._not_lying_since = (
-                    self._not_lying_since if self._not_lying_since is not None else x.t_s
+                    self._not_lying_since
+                    if self._not_lying_since is not None
+                    else x.t_s
                 )
             if (
                 self._lying_since is not None
@@ -199,7 +203,11 @@ class FallStateMachine:
         elif self.state is State.FALLEN and self._last_frame is not None:
             self._ctx.rules_fired.add("track_lost_while_fallen")
             self._close_event(self._last_frame, self._last_t)
-        elif self.state is State.FALLING and self._last_lying and self._last_frame is not None:
+        elif (
+            self.state is State.FALLING
+            and self._last_lying
+            and self._last_frame is not None
+        ):
             self._ctx.rules_fired.add("track_lost_while_falling_with_lying_posture")
             self._close_event(self._last_frame, self._last_t)
         self._ctx = None

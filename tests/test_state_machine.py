@@ -40,7 +40,17 @@ def _fall_to_alarm(cfg):
     """站立 → 觸發 → 躺地至 ALARM,回傳 (fsm, t, frame)。"""
     fsm = FallStateMachine(cfg.rules, track_id=1)
     t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
-    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
+    fsm.tick(
+        TickInput(
+            t_s=t,
+            frame_idx=f,
+            theta_deg=30.0,
+            bbox_aspect=0.8,
+            h_hip=1.2,
+            v_norm=3.0,
+            omega=120.0,
+        )
+    )
     assert fsm.state is State.FALLING
     t, f = t + DT, f + 1
     t, f = _feed(fsm, t, 2.0, f, **LYING_KW)
@@ -75,7 +85,17 @@ def test_finalize_while_fallen_still_closes_event(cfg):
     rules = cfg.rules.model_copy(update={"t_confirm_fallen_s": 5.0})
     fsm = FallStateMachine(rules, track_id=1)
     t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
-    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
+    fsm.tick(
+        TickInput(
+            t_s=t,
+            frame_idx=f,
+            theta_deg=30.0,
+            bbox_aspect=0.8,
+            h_hip=1.2,
+            v_norm=3.0,
+            omega=120.0,
+        )
+    )
     t, f = _feed(fsm, t + DT, 0.6, f + 1, **LYING_KW)
     assert fsm.state is State.FALLEN
     events = fsm.finalize()
@@ -91,7 +111,17 @@ def test_finalize_while_falling_with_lying_posture_closes_event(cfg):
     fall-24 踩到的真實案例(訊號都到位,只是資料在視窗跑完前就斷了)。"""
     fsm = FallStateMachine(cfg.rules, track_id=1)
     t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
-    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
+    fsm.tick(
+        TickInput(
+            t_s=t,
+            frame_idx=f,
+            theta_deg=30.0,
+            bbox_aspect=0.8,
+            h_hip=1.2,
+            v_norm=3.0,
+            omega=120.0,
+        )
+    )
     assert fsm.state is State.FALLING
     t, f = t + DT, f + 1
     # 只餵 1 幀躺姿(遠不足以撐滿 window_confirm_s 的時窗投票),track 就此消失
@@ -107,7 +137,17 @@ def test_finalize_while_falling_without_lying_posture_no_event(cfg):
     不該生出事件——避免這個新規則過度寬鬆,只認最後一次真的像躺姿的情況。"""
     fsm = FallStateMachine(cfg.rules, track_id=1)
     t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
-    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
+    fsm.tick(
+        TickInput(
+            t_s=t,
+            frame_idx=f,
+            theta_deg=30.0,
+            bbox_aspect=0.8,
+            h_hip=1.2,
+            v_norm=3.0,
+            omega=120.0,
+        )
+    )
     assert fsm.state is State.FALLING
     t, f = t + DT, f + 1
     fsm.tick(TickInput(t_s=t, frame_idx=f, **SIT_KW))  # 坐姿:不符合躺姿 m-of-n
@@ -121,7 +161,17 @@ def test_bridge_gap_prevents_false_falling_timeout(cfg):
     t_falling_timeout_s)。"""
     fsm = FallStateMachine(cfg.rules, track_id=1)
     t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
-    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
+    fsm.tick(
+        TickInput(
+            t_s=t,
+            frame_idx=f,
+            theta_deg=30.0,
+            bbox_aspect=0.8,
+            h_hip=1.2,
+            v_norm=3.0,
+            omega=120.0,
+        )
+    )
     assert fsm.state is State.FALLING
     falling_since_before = fsm._falling_since
     # 消失空窗:真實經過時間 > t_falling_timeout_s,不橋接就會誤觸發回退
@@ -130,7 +180,17 @@ def test_bridge_gap_prevents_false_falling_timeout(cfg):
     fsm.bridge_gap(gap)
     assert fsm._falling_since == falling_since_before + gap
     t2 = t + DT + gap
-    fsm.tick(TickInput(t_s=t2, frame_idx=f + 1, theta_deg=85.0, bbox_aspect=2.5, h_hip=0.1, v_norm=0.2, omega=0.0))
+    fsm.tick(
+        TickInput(
+            t_s=t2,
+            frame_idx=f + 1,
+            theta_deg=85.0,
+            bbox_aspect=2.5,
+            h_hip=0.1,
+            v_norm=0.2,
+            omega=0.0,
+        )
+    )
     assert fsm.state is State.FALLING  # 沒被誤回退成 UPRIGHT
     assert fsm.track_ids == [1, 9]
 
@@ -146,11 +206,31 @@ def test_bridge_gap_does_not_pollute_vote_window_with_stale_samples(cfg):
     rules = cfg.rules.model_copy(update={"t_confirm_fallen_s": 5.0})
     fsm = FallStateMachine(rules, track_id=1)
     t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
-    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.2, v_norm=3.0, omega=120.0))
+    fsm.tick(
+        TickInput(
+            t_s=t,
+            frame_idx=f,
+            theta_deg=30.0,
+            bbox_aspect=0.8,
+            h_hip=1.2,
+            v_norm=3.0,
+            omega=120.0,
+        )
+    )
     # 短暫停留 FALLING,累積幾幀「尚未躺平」的 False 投票樣本
     # (相對 cfg 取值,落在遲滯出口與進入閾值之間,不誤觸任何一個邊界)
     not_lying_theta = rules.theta_lying_enter - 15
-    t, f = _feed(fsm, t + DT, 0.3, f + 1, theta_deg=not_lying_theta, bbox_aspect=0.7, h_hip=1.0, v_norm=2.0, omega=0.0)
+    t, f = _feed(
+        fsm,
+        t + DT,
+        0.3,
+        f + 1,
+        theta_deg=not_lying_theta,
+        bbox_aspect=0.7,
+        h_hip=1.0,
+        v_norm=2.0,
+        omega=0.0,
+    )
     assert fsm.state is State.FALLING
     fsm.adopt(9)
     fsm.bridge_gap(1.5)
@@ -164,7 +244,17 @@ def test_bridge_gap_does_not_pollute_vote_window_with_stale_samples(cfg):
 def test_falling_timeout_rejects_fast_sit(cfg):
     fsm = FallStateMachine(cfg.rules, track_id=1)
     t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
-    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=15.0, bbox_aspect=0.5, h_hip=1.0, v_norm=2.5, omega=30.0))
+    fsm.tick(
+        TickInput(
+            t_s=t,
+            frame_idx=f,
+            theta_deg=15.0,
+            bbox_aspect=0.5,
+            h_hip=1.0,
+            v_norm=2.5,
+            omega=30.0,
+        )
+    )
     assert fsm.state is State.FALLING
     t, f = _feed(fsm, t + DT, cfg.rules.t_falling_timeout_s + 0.3, f + 1, **SIT_KW)
     assert fsm.state is State.UPRIGHT
@@ -176,7 +266,17 @@ def test_fallen_recovery_before_confirm_yields_no_event(cfg):
     rules = cfg.rules.model_copy(update={"t_confirm_fallen_s": 2.0})
     fsm = FallStateMachine(rules, track_id=1)
     t, f = _feed(fsm, 0.0, 1.0, 0, **UPRIGHT_KW)
-    fsm.tick(TickInput(t_s=t, frame_idx=f, theta_deg=30.0, bbox_aspect=0.8, h_hip=1.0, v_norm=3.0, omega=100.0))
+    fsm.tick(
+        TickInput(
+            t_s=t,
+            frame_idx=f,
+            theta_deg=30.0,
+            bbox_aspect=0.8,
+            h_hip=1.0,
+            v_norm=3.0,
+            omega=100.0,
+        )
+    )
     t, f = _feed(fsm, t + DT, 0.6, f + 1, **LYING_KW)
     assert fsm.state is State.FALLEN
     t, f = _feed(fsm, t, 1.0, f, **UPRIGHT_KW)
@@ -197,8 +297,17 @@ def test_hysteresis_no_chatter_around_lying_threshold(cfg):
     for i in range(n):
         theta = theta_hi if i % 2 == 0 else theta_lo
         h_hip = h_hip_hi if i % 2 == 0 else h_hip_lo
-        fsm.tick(TickInput(t_s=t + i * DT, frame_idx=f + i, theta_deg=theta,
-                           bbox_aspect=1.2, h_hip=h_hip, v_norm=0.0, omega=0.0))
+        fsm.tick(
+            TickInput(
+                t_s=t + i * DT,
+                frame_idx=f + i,
+                theta_deg=theta,
+                bbox_aspect=1.2,
+                h_hip=h_hip,
+                v_norm=0.0,
+                omega=0.0,
+            )
+        )
         states.append(fsm.state)
     assert all(s is State.ALARM for s in states)  # 震盪期間狀態穩定
     events = fsm.finalize()
@@ -209,8 +318,17 @@ def test_none_inputs_do_not_trigger_or_crash(cfg):
     """v/omega/h_hip 為 None(歷史不足、踝不可見):不觸發任何條件、不拋例外。"""
     fsm = FallStateMachine(cfg.rules, track_id=1)
     for i in range(60):
-        fsm.tick(TickInput(t_s=i * DT, frame_idx=i, theta_deg=5.0,
-                           bbox_aspect=0.4, h_hip=None, v_norm=None, omega=None))
+        fsm.tick(
+            TickInput(
+                t_s=i * DT,
+                frame_idx=i,
+                theta_deg=5.0,
+                bbox_aspect=0.4,
+                h_hip=None,
+                v_norm=None,
+                omega=None,
+            )
+        )
     assert fsm.state is State.UPRIGHT
     assert fsm.finalize() == []
 

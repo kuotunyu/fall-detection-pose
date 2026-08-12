@@ -30,15 +30,13 @@ def _quick_sha1(path: str | Path, n_bytes: int = 1 << 20) -> str:
 
 def _git_commit() -> str:
     try:
-        return (
-            subprocess.run(
-                ["git", "rev-parse", "--short", "HEAD"],
-                capture_output=True,
-                text=True,
-                check=True,
-                cwd=Path(__file__).resolve().parent,
-            ).stdout.strip()
-        )
+        return subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=Path(__file__).resolve().parent,
+        ).stdout.strip()
     except Exception:  # noqa: BLE001 - 沒 git(如 pip 安裝)不影響功能
         return ""
 

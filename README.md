@@ -7,7 +7,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![YOLO26-pose](https://img.shields.io/badge/Pose-YOLO26--pose-635BFF)
 ![Tracker](https://img.shields.io/badge/Tracker-ByteTrack-287D72)
-[![License](https://img.shields.io/badge/License-MIT-3A7D44.svg)](LICENSE)
+[![Code license](https://img.shields.io/badge/Code-MIT-3A7D44.svg)](LICENSE)
 
 FallSense 以 **YOLO26-pose** 擷取人體姿態、**ByteTrack** 延續 Track ID，再由可解釋的有限狀態機（UPRIGHT → FALLING → FALLEN → ALARM）判定跌倒事件。每次警示都保留事件時間、Track ID 與 `rules_fired`，讓結果不只回答「有沒有跌倒」，也能說明「為什麼觸發」。
 
@@ -15,7 +15,7 @@ FallSense 以 **YOLO26-pose** 擷取人體姿態、**ByteTrack** 延續 Track ID
 
 | Test event-level F1 | ADL specificity | T4 · yolo26n FP16 | 2-vCPU · yolo26n | Offline tests |
 | ---: | ---: | ---: | ---: | ---: |
-| **0.600** | **0.741** | **64.64 FPS** | **8.23 FPS** | **118** |
+| **0.600** | **0.741** | **64.64 FPS** | **8.23 FPS** | **121** |
 
 測試集包含 20 段跌倒與 27 段 ADL；數據、切分名單、失敗案例與環境紀錄均已納入 repository。完整的評估限制與開發後修正揭露請見[評估結果](#評估結果)。
 
@@ -48,7 +48,7 @@ FallSense 以 **YOLO26-pose** 擷取人體姿態、**ByteTrack** 延續 Track ID
 - **推論與規則解耦**：GPU 姿態推論只需執行一次並寫入 Keypoint Cache；調參、狀態判定與事件評估可直接在 CPU 重跑。
 - **事件層級評估**：採用明確的一對一事件配對，而不是只報告 frame-level accuracy；ADL 中的任何預測都會計為 FP。
 - **失敗模式分析**：除 Precision、Recall 與 F1 外，也分析追蹤中斷、主動臥床及重複事件等具體案例。
-- **可重現工程流程**：`uv.lock` 鎖定依賴，GitHub Actions 在 Python 3.10／3.12 執行 Ruff 與 118 項 offline tests。
+- **可重現工程流程**：`uv.lock` 鎖定依賴，GitHub Actions 在 Python 3.10／3.12 執行 Ruff、封裝驗證、依賴安全稽核與 121 項 offline tests，另以真實 YOLO26n-pose 與 ByteTrack 執行 1 項端到端 inference smoke test。
 
 ## 快速開始
 
@@ -85,11 +85,28 @@ uv run fdp pipeline \
 | `outputs/input_annotated.mp4` | H.264 骨架、Track ID、狀態與警示標註影片 |
 | `outputs/input.debug.jsonl` | `--debug` 啟用時輸出的逐幀特徵與狀態 |
 
+### 從 Keypoint Cache 重現評估
+
+推論產生的 cache 可直接在 CPU 上重跑凍結規則與 event-level 評估，不必再次執行模型：
+
+```bash
+uv run fdp evaluate \
+  --cache-root /path/to/cache \
+  --annotations /path/to/urfall-cam0-falls.csv \
+  --model yolo26n-pose \
+  --model yolo26s-pose \
+  --out outputs/evaluation.json
+```
+
+`--cache-root` 內應依模型分目錄，例如 `yolo26n-pose/fall-01.parquet`。命令預設讀取
+`eval/splits.yaml` 與 `config.yaml`，只評估凍結的 test split；Notebook 03 則保留完整調參歷程。
+
 <details>
 <summary><strong>執行開發驗證</strong></summary>
 
 ```bash
 uv sync --locked --group dev --extra demo
+uv run ruff format --check .
 uv run ruff check .
 uv run pytest -q
 ```
@@ -225,8 +242,10 @@ Notebooks 用於重現開發、校準與評估流程，不是觀看 Demo 的必�
 
 ## 授權與資料來源
 
-原始程式碼以 [MIT License](LICENSE) 釋出。
+本專案作者撰寫的原始程式碼以 [MIT License](LICENSE) 釋出。Ultralytics 套件與官方
+YOLO 權重預設適用 **AGPL-3.0**，不屬於本專案 MIT 授權範圍；商業或封閉原始碼整合前
+應確認其適用授權。
 
-評估使用 [UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html)。本 repository 不重新散布原始資料；資料集與衍生展示媒體依 **CC BY-NC-SA 4.0** 使用，完整歸屬與適用範圍見 [Third-party notices](THIRD_PARTY_NOTICES.md)。
+評估使用 [UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html)。本 repository 不重新散布原始資料；資料集與衍生展示媒體依 **CC BY-NC-SA 4.0** 使用。完整第三方授權邊界見 [Third-party notices](THIRD_PARTY_NOTICES.md)。
 
 資料集論文：[Kwolek & Kepski, 2014](https://doi.org/10.1016/j.cmpb.2014.09.005)。

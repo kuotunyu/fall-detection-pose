@@ -10,6 +10,9 @@
       "test_adls": 27
     }
   },
+  "repository_evidence": {
+    "offline_tests": 121
+  },
   "winning_params": {
     "kpt_conf_min": 0.25,
     "v_fall_enter": 0.8,

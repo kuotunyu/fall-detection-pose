@@ -100,10 +100,14 @@ def test_track_switch_stitched_into_one_event(cfg):
 
 def test_no_stitch_when_bboxes_far_apart(cfg):
     """負向縫合:視窗內出現的新 track 若 IoU 不足,必須各自獨立(不繼承狀態)。"""
-    faller = make_trajectory([("stand", 2.0), ("to:lie", 0.6), ("lie", 3.0)], fps=FPS, track_id=1)
+    faller = make_trajectory(
+        [("stand", 2.0), ("to:lie", 0.6), ("lie", 3.0)], fps=FPS, track_id=1
+    )
     # 第二人的 track 於 t=2.5(跌落中途)才出生,且出生在遠處:
     # IoU=0,不得繼承任何人的 FSM
-    late_walker = make_trajectory([("walk", 3.1)], fps=FPS, track_id=3, x0=900.0, seed=2)
+    late_walker = make_trajectory(
+        [("walk", 3.1)], fps=FPS, track_id=3, x0=900.0, seed=2
+    )
     late_walker["frame_idx"] = late_walker["frame_idx"] + 75  # 從 t=2.5s 開始
     late_walker["t_ms"] = late_walker["t_ms"] + 2500.0
     df = (
@@ -118,7 +122,9 @@ def test_no_stitch_when_bboxes_far_apart(cfg):
 
 def test_no_stitch_after_window_expires(cfg):
     """負向縫合:舊 track 消失超過 track_stitch_window_s 後,同位置的新 track 不縫合。"""
-    df = make_trajectory([("stand", 2.0), ("to:lie", 0.6), ("lie", 2.0)], fps=FPS, track_id=1)
+    df = make_trajectory(
+        [("stand", 2.0), ("to:lie", 0.6), ("lie", 2.0)], fps=FPS, track_id=1
+    )
     # 舊 track 於 t=4.6 結束;新 track 9 於 t=6.1 出現(間隔 1.5s > 1.0s 窗)
     reappear = make_trajectory([("lie", 2.0)], fps=FPS, track_id=9)
     reappear["frame_idx"] = reappear["frame_idx"] + 183  # t=6.1s 起
@@ -147,7 +153,9 @@ def test_stitch_across_extended_window_while_falling(cfg):
     events, _ = run_engine(df, FPS, cfg)
     assert len(events) == 1
     assert events[0].track_ids == [1, 6]
-    assert "lying_persisted" in events[0].rules_fired  # 真的撐到 ALARM,不只是 FALLEN 收尾
+    assert (
+        "lying_persisted" in events[0].rules_fired
+    )  # 真的撐到 ALARM,不只是 FALLEN 收尾
 
 
 def test_no_extended_stitch_when_last_state_upright(cfg):
@@ -156,7 +164,9 @@ def test_no_extended_stitch_when_last_state_upright(cfg):
     證明加長版時間窗只認 FSM 狀態,不是把一般縫合窗整個放寬到 2s
     ——同樣的間隔、同樣的躺姿外觀,只因舊 state 不是 FALLING/FALLEN 就不縫合。
     """
-    old = make_trajectory([("lie", 2.6)], fps=FPS, track_id=1)  # 全程恆定躺姿:無位移→無速度觸發,state 全程 UPRIGHT
+    old = make_trajectory(
+        [("lie", 2.6)], fps=FPS, track_id=1
+    )  # 全程恆定躺姿:無位移→無速度觸發,state 全程 UPRIGHT
     reappear = make_trajectory([("lie", 2.0)], fps=FPS, track_id=6)
     reappear["frame_idx"] = reappear["frame_idx"] + 123
     reappear["t_ms"] = reappear["t_ms"] + 4100.0
@@ -187,7 +197,9 @@ def test_stitch_then_track_lost_before_alarm_still_one_event(cfg):
 
 
 def test_scale_invariance_exact(cfg):
-    df = make_trajectory([("stand", 2.0), ("to:lie", 0.6), ("lie", 3.0)], fps=FPS, noise=0.5)
+    df = make_trajectory(
+        [("stand", 2.0), ("to:lie", 0.6), ("lie", 3.0)], fps=FPS, noise=0.5
+    )
     ev_a, _ = run_engine(df, FPS, cfg)
     ev_b, _ = run_engine(scale_coords(df, 0.5), FPS, cfg)  # ×0.5:浮點精確縮放
     assert [(e.start_frame, e.end_frame) for e in ev_a] == [
@@ -206,7 +218,9 @@ def test_fps_invariance(cfg):
 
 def test_two_people_independent_states(cfg):
     """多人:一人跌倒、一人走動——事件只屬於跌倒者的 track。"""
-    faller = make_trajectory([("stand", 2.0), ("to:lie", 0.6), ("lie", 3.0)], fps=FPS, track_id=1)
+    faller = make_trajectory(
+        [("stand", 2.0), ("to:lie", 0.6), ("lie", 3.0)], fps=FPS, track_id=1
+    )
     walker = make_trajectory([("walk", 5.6)], fps=FPS, track_id=2, x0=800.0, seed=1)
     df = (
         pd.concat([faller, walker], ignore_index=True)

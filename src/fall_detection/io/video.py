@@ -74,11 +74,16 @@ def reencode_h264(src: str | Path, dst: str | Path) -> None:
     cmd = [
         get_ffmpeg_exe(),
         "-y",
-        "-loglevel", "error",
-        "-i", str(src),
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",       # yuv444 在 Chrome/Safari 播不了
-        "-movflags", "+faststart",   # moov atom 前置,邊下載邊播
+        "-loglevel",
+        "error",
+        "-i",
+        str(src),
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",  # yuv444 在 Chrome/Safari 播不了
+        "-movflags",
+        "+faststart",  # moov atom 前置,邊下載邊播
         str(dst),
     ]
     subprocess.run(cmd, check=True)
@@ -95,7 +100,9 @@ class H264VideoWriter:
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         self._writer = cv2.VideoWriter(str(self._tmp), fourcc, fps, (width, height))
         if not self._writer.isOpened():
-            raise RuntimeError(f"VideoWriter 開啟失敗(fps={fps}, size={width}x{height})")
+            raise RuntimeError(
+                f"VideoWriter 開啟失敗(fps={fps}, size={width}x{height})"
+            )
 
     def write(self, frame_bgr: np.ndarray) -> None:
         self._writer.write(frame_bgr)
@@ -121,7 +128,9 @@ class H264VideoWriter:
         self.close()
 
 
-def write_video_mp4v(frames: Iterator[np.ndarray], out_path: str | Path, fps: float) -> int:
+def write_video_mp4v(
+    frames: Iterator[np.ndarray], out_path: str | Path, fps: float
+) -> int:
     """把幀序列寫成 mp4v 影片(僅供內部再處理,如 URFD PNG 序列重組;
     非瀏覽器播放用途,不做 H.264 重編碼以省時)。回傳寫入幀數。"""
     out_path = Path(out_path)

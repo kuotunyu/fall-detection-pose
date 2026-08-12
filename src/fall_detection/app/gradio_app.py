@@ -29,6 +29,8 @@ class StreamMessage:
     annotated_path: str | None = None
     events_path: str | None = None
     error: Exception | None = None
+
+
 EVENT_TABLE_HEADERS = ["Track ID", "開始時間(s)", "結束時間(s)", "時長(s)", "觸發規則"]
 
 
@@ -199,7 +201,7 @@ def build_demo(
     evidence_html = render_evidence_html(load_evidence(project_root))
     section_title = (
         '<div class="fd-section-title"><h2>影片分析工作區</h2>'
-        '<p>上傳短片後，系統依序執行姿態估計、Track 關聯與事件規則。</p></div>'
+        "<p>上傳短片後，系統依序執行姿態估計、Track 關聯與事件規則。</p></div>"
     )
 
     with gr.Blocks(
@@ -226,10 +228,10 @@ def build_demo(
                 with gr.Column(min_width=310):
                     gr.HTML(
                         '<div class="fd-input-copy"><small>INPUT</small>'
-                        '<h3>選擇待分析影片</h3>'
-                        '<p>支援 MP4、MOV。建議使用 5–20 秒且人物全身可見的短片；單檔上限 200 MB。</p>'
-                        '<dl><div><dt>輸出</dt><dd>標註影片</dd></div>'
-                        '<div><dt>事件資料</dt><dd>events.json</dd></div></dl></div>',
+                        "<h3>選擇待分析影片</h3>"
+                        "<p>支援 MP4、MOV。建議使用 5–20 秒且人物全身可見的短片；單檔上限 200 MB。</p>"
+                        "<dl><div><dt>輸出</dt><dd>標註影片</dd></div>"
+                        "<div><dt>事件資料</dt><dd>events.json</dd></div></dl></div>",
                         container=False,
                     )
                     with gr.Accordion("進階設定", open=False):
@@ -422,8 +424,12 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="config.yaml")
-    parser.add_argument("--examples", nargs="*", default=None, help="範例影片路徑(可選,可多個)")
-    parser.add_argument("--no-share", action="store_true", help="停用 public link(僅本機測試用)")
+    parser.add_argument(
+        "--examples", nargs="*", default=None, help="範例影片路徑(可選,可多個)"
+    )
+    parser.add_argument(
+        "--no-share", action="store_true", help="停用 public link(僅本機測試用)"
+    )
     parser.add_argument("--server-port", type=int, default=None)
     args = parser.parse_args()
 

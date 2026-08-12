@@ -39,7 +39,9 @@ def test_events_postprocess_merge_and_min_duration(cfg):
     from fall_detection.events.schema import FallEvent, postprocess_events
 
     a = FallEvent([1], 60, 90, 2.0, 3.0, {"max_v_torso_per_s": 2.0}, ["v>v_fall_enter"])
-    b = FallEvent([1, 7], 105, 150, 3.5, 5.0, {"max_v_torso_per_s": 3.0}, ["lying_persisted"])
+    b = FallEvent(
+        [1, 7], 105, 150, 3.5, 5.0, {"max_v_torso_per_s": 3.0}, ["lying_persisted"]
+    )
     c = FallEvent([2], 200, 202, 6.6, 6.7, {}, [])  # 0.1s 抖動殘渣
     out = postprocess_events([c, b, a], cfg.events)  # 順序故意打亂
     assert len(out) == 1  # a+b 合併(同 track 鏈、gap 0.5 < 1.0);c 被濾掉
@@ -63,7 +65,7 @@ def test_merge_not_blocked_by_interleaved_other_chain(cfg):
     from fall_detection.events.schema import FallEvent, postprocess_events
 
     a1 = FallEvent([1], 60, 90, 2.0, 3.0, {}, [])
-    b = FallEvent([2], 96, 114, 3.2, 3.8, {}, [])   # 依 start 排序會插在 a1 與 a2 之間
+    b = FallEvent([2], 96, 114, 3.2, 3.8, {}, [])  # 依 start 排序會插在 a1 與 a2 之間
     a2 = FallEvent([1], 105, 150, 3.5, 5.0, {}, [])  # 與 a1 間隔 0.5s < merge_gap_s
     out = postprocess_events([a1, b, a2], cfg.events)
     assert len(out) == 2

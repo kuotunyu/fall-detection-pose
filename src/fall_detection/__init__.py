@@ -5,4 +5,4 @@
 - ``inference`` / ``viz`` / ``app`` 依賴 ultralytics/opencv/gradio(extras:infer、demo)。
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

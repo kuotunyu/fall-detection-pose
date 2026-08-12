@@ -121,5 +121,7 @@ def test_stream_process_yields_terminal_error_without_raising():
     assert len(messages) == 1
     assert messages[0].kind == "error"
     assert messages[0].error is failure
+
+
 def test_header_links_to_public_repository():
     assert "https://github.com/kuotunyu/fall-detection-pose" in APP_HEADER_HTML

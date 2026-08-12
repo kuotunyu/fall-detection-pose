@@ -16,8 +16,10 @@ jobs:
       matrix:
         python-version: ["3.10", "3.12"]
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v9.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -25,5 +27,43 @@ jobs:
         run: uv sync --locked --group dev --extra demo
       - name: Lint
         run: uv run ruff check .
+      - name: Format
+        run: uv run ruff format --check .
       - name: Test
         run: uv run pytest
+      - name: CLI smoke test
+        run: uv run fdp --help
+      - name: Build package artifacts
+        if: matrix.python-version == '3.12'
+        run: uv build
+      - name: Verify source distribution excludes downloaded weights
+        if: matrix.python-version == '3.12'
+        run: >-
+          uv run python -c "import pathlib, tarfile;
+          archive = next(pathlib.Path('dist').glob('*.tar.gz'));
+          bundled = [name for name in tarfile.open(archive).getnames() if name.endswith('.pt')];
+          assert not bundled, f'downloaded weights found in sdist: {bundled}'"
+      - name: Audit demo dependencies
+        if: matrix.python-version == '3.12'
+        run: uv run --with pip-audit==2.10.1 pip-audit --skip-editable
+
+  inference-smoke:
+    name: Real model inference smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - name: Install locked inference dependencies
+        run: uv sync --locked --group dev --extra infer
+      - name: Audit inference dependencies
+        run: uv run --with pip-audit==2.10.1 pip-audit --skip-editable
+      - name: Run YOLO26n-pose and ByteTrack end to end
+        env:
+          FDP_RUN_INFERENCE_SMOKE: "1"
+        run: uv run pytest tests/test_inference_smoke.py -v

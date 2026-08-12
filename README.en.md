@@ -7,7 +7,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![YOLO26-pose](https://img.shields.io/badge/Pose-YOLO26--pose-635BFF)
 ![Tracker](https://img.shields.io/badge/Tracker-ByteTrack-287D72)
-[![License](https://img.shields.io/badge/License-MIT-3A7D44.svg)](LICENSE)
+[![Code license](https://img.shields.io/badge/Code-MIT-3A7D44.svg)](LICENSE)
 
 FallSense extracts human pose keypoints with **YOLO26-pose**, maintains identities with **ByteTrack**, and detects fall events through an interpretable finite-state machine (UPRIGHT → FALLING → FALLEN → ALARM). Every alert preserves its time interval, Track ID, and `rules_fired`, so the output explains not only *whether* a fall was detected, but *why* it fired.
 
@@ -15,7 +15,7 @@ FallSense extracts human pose keypoints with **YOLO26-pose**, maintains identiti
 
 | Test event-level F1 | ADL specificity | T4 · yolo26n FP16 | 2-vCPU · yolo26n | Offline tests |
 | ---: | ---: | ---: | ---: | ---: |
-| **0.600** | **0.741** | **64.64 FPS** | **8.23 FPS** | **118** |
+| **0.600** | **0.741** | **64.64 FPS** | **8.23 FPS** | **121** |
 
 The test split contains 20 fall videos and 27 activities-of-daily-living (ADL) videos. Raw metrics, frozen splits, failure cases, and benchmark environment records are committed to the repository. See [Evaluation](#evaluation) for the full protocol and post-development disclosure.
 
@@ -48,7 +48,7 @@ These assets were captured from actual runs of the full Gradio pipeline. The sou
 - **Decoupled inference and rules:** GPU pose inference runs once and writes a Keypoint Cache; tuning, state transitions, and event evaluation can then be rerun on CPU.
 - **Event-level evaluation:** the project uses explicit one-to-one event matching instead of reporting frame-level accuracy alone; any event predicted on an ADL video counts as a false positive.
 - **Failure-mode analysis:** beyond Precision, Recall, and F1, the repository examines tracker loss, voluntary lying down, and duplicate-event cases.
-- **Reproducible engineering:** `uv.lock` pins dependencies, and GitHub Actions runs Ruff plus 118 offline tests on Python 3.10 and 3.12.
+- **Reproducible engineering:** `uv.lock` pins dependencies, and GitHub Actions runs Ruff, package builds, dependency audits, and 121 offline tests on Python 3.10 and 3.12, plus one end-to-end inference smoke test with the real YOLO26n-pose and ByteTrack stack.
 
 ## Quick start
 
@@ -85,11 +85,30 @@ Primary outputs:
 | `outputs/input_annotated.mp4` | H.264 video with skeleton, Track ID, state, and alert overlays |
 | `outputs/input.debug.jsonl` | Per-frame features and state when `--debug` is enabled |
 
+### Reproduce evaluation from the Keypoint Cache
+
+Rerun the frozen rules and event-level evaluation on CPU without repeating pose inference:
+
+```bash
+uv run fdp evaluate \
+  --cache-root /path/to/cache \
+  --annotations /path/to/urfall-cam0-falls.csv \
+  --model yolo26n-pose \
+  --model yolo26s-pose \
+  --out outputs/evaluation.json
+```
+
+`--cache-root` contains one directory per model, such as
+`yolo26n-pose/fall-01.parquet`. The command reads `eval/splits.yaml` and
+`config.yaml` by default and evaluates only the frozen test split; Notebook 03
+retains the complete tuning history.
+
 <details>
 <summary><strong>Run development checks</strong></summary>
 
 ```bash
 uv sync --locked --group dev --extra demo
+uv run ruff format --check .
 uv run ruff check .
 uv run pytest -q
 ```
@@ -225,8 +244,11 @@ The notebooks reproduce development, calibration, and evaluation; they are not r
 
 ## License and dataset
 
-Original source code is released under the [MIT License](LICENSE).
+Original code written for this project is released under the [MIT License](LICENSE).
+The Ultralytics package and official YOLO weights are **AGPL-3.0** by default and
+are outside this project's MIT grant; review the applicable terms before a
+commercial or closed-source integration.
 
-Evaluation uses the [UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html). This repository does not redistribute the original dataset. The dataset and derived demonstration media remain subject to **CC BY-NC-SA 4.0**; see [Third-party notices](THIRD_PARTY_NOTICES.md) for attribution and scope.
+Evaluation uses the [UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html). This repository does not redistribute the original dataset. The dataset and derived demonstration media remain subject to **CC BY-NC-SA 4.0**; see [Third-party notices](THIRD_PARTY_NOTICES.md) for attribution and all third-party license boundaries.
 
 Dataset paper: [Kwolek & Kepski, 2014](https://doi.org/10.1016/j.cmpb.2014.09.005).

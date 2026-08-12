@@ -26,7 +26,13 @@ def test_load_evidence_uses_tracked_results(tmp_path):
     """Wrong benchmark row selection or number formatting must fail this test."""
     (tmp_path / "eval").mkdir()
     (tmp_path / "eval" / "metrics.json").write_text(
-        json.dumps({"test_metrics_yolo26n_pose": {"f1": 0.6}}), encoding="utf-8"
+        json.dumps(
+            {
+                "repository_evidence": {"offline_tests": 123},
+                "test_metrics_yolo26n_pose": {"f1": 0.6},
+            }
+        ),
+        encoding="utf-8",
     )
     (tmp_path / "bench.json").write_text(
         json.dumps(
@@ -50,17 +56,17 @@ def test_load_evidence_uses_tracked_results(tmp_path):
         encoding="utf-8",
     )
 
-    items = load_evidence(tmp_path, test_count=86)
+    items = load_evidence(tmp_path)
 
     assert [(item.value, item.label, item.detail) for item in items] == [
         ("64.64 FPS", "端到端速度 · T4 FP16", "yolo26n-pose"),
         ("0.600", "Test event-level F1", ""),
-        ("86", "離線單元測試", ""),
+        ("123", "離線測試", ""),
     ]
 
 
 def test_load_evidence_omits_strip_when_evidence_is_missing(tmp_path):
-    assert load_evidence(tmp_path, test_count=86) == ()
+    assert load_evidence(tmp_path) == ()
 
 
 def test_load_analysis_payload_reads_events_and_metadata(tmp_path):
@@ -94,9 +100,7 @@ def test_result_escapes_source_and_unknown_rule():
         fps=30.0,
         n_frames=2,
         n_tracks=1,
-        events=(
-            _event(rules=["<unsafe>"], track_ids=[1, 7]),
-        ),
+        events=(_event(rules=["<unsafe>"], track_ids=[1, 7]),),
     )
 
     result = render_result_html(payload)

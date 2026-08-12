@@ -51,7 +51,12 @@ def test_two_gts_two_preds_both_match():
 
 def test_evaluate_videos_aggregation_and_specificity():
     videos = [
-        {"name": "fall-01", "is_adl": False, "preds": [(2.0, 5.0)], "gts": [(2.1, 4.0)]},
+        {
+            "name": "fall-01",
+            "is_adl": False,
+            "preds": [(2.0, 5.0)],
+            "gts": [(2.1, 4.0)],
+        },
         {"name": "fall-02", "is_adl": False, "preds": [], "gts": [(3.0, 5.0)]},
         {"name": "adl-01", "is_adl": True, "preds": [(1.0, 2.0)], "gts": []},
         {"name": "adl-02", "is_adl": True, "preds": [], "gts": []},

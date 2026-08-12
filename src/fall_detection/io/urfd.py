@@ -104,7 +104,9 @@ def download_sequences(
     return out
 
 
-def zip_to_video(zip_path: str | Path, out_path: str | Path, fps: float = URFD_FPS) -> Path:
+def zip_to_video(
+    zip_path: str | Path, out_path: str | Path, fps: float = URFD_FPS
+) -> Path:
     """PNG 序列 zip → mp4(幀序依檔名排序;輸出已存在即跳過)。
 
     重組出的 mp4 僅供推論讀取,用 mp4v 即可(非瀏覽器播放用途)。

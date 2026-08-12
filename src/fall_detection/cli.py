@@ -66,7 +66,9 @@ def cmd_detect(args: argparse.Namespace) -> int:
     """cache → events.json;--debug 另存 per-frame 特徵 JSONL(失敗分析用)。"""
     from .events.schema import write_events_json
 
-    _cfg, _, meta, events, debug = _run_rules(args.cache, args.config, args.debug is not None)
+    _cfg, _, meta, events, debug = _run_rules(
+        args.cache, args.config, args.debug is not None
+    )
     write_events_json(args.out, events, source=meta.video_path, fps=meta.fps)
     if args.debug:
         _write_debug_jsonl(args.debug, debug)
@@ -103,7 +105,9 @@ def _record_webcam(index: int, duration_s: float, out_path: Path) -> Path:
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+    writer = cv2.VideoWriter(
+        str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h)
+    )
     n = int(duration_s * fps)
     print(f"webcam 錄製 {duration_s:.0f}s({n} 幀)…")
     for _ in range(n):
@@ -199,8 +203,35 @@ def cmd_bench(args: argparse.Namespace) -> int:
             "results": results,
         }
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.out).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        Path(args.out).write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         print(f"→ {args.out}")
+    return 0
+
+
+def cmd_evaluate(args: argparse.Namespace) -> int:
+    """Reproduce test-split event metrics from frozen keypoint caches."""
+    from .eval.runner import evaluate_cache_root
+
+    report = evaluate_cache_root(
+        cache_root=args.cache_root,
+        annotations_path=args.annotations,
+        splits_path=args.splits,
+        config_path=args.config,
+        model_names=args.model or ["yolo26n-pose", "yolo26s-pose"],
+        tol_s=args.tol_s,
+    )
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"evaluation → {out}")
+    for model_name, result in report["models"].items():
+        metrics = result["metrics"]
+        print(
+            f"  {model_name}: precision={metrics['precision']:.3f} "
+            f"recall={metrics['recall']:.3f} F1={metrics['f1']:.3f}"
+        )
     return 0
 
 
@@ -212,8 +243,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--source", required=True, help="影片檔或影片目錄")
     p.add_argument("--out", required=True, help="輸出 parquet 或目錄")
     p.add_argument("--config", default="config.yaml")
-    p.add_argument("--model", default=None, help="覆寫 config 的模型名(如 yolo26s-pose.pt)")
-    p.add_argument("--device", default=None, help="cuda:0 / cpu(預設由 ultralytics 自選)")
+    p.add_argument(
+        "--model", default=None, help="覆寫 config 的模型名(如 yolo26s-pose.pt)"
+    )
+    p.add_argument(
+        "--device", default=None, help="cuda:0 / cpu(預設由 ultralytics 自選)"
+    )
     p.set_defaults(func=cmd_extract)
 
     p = sub.add_parser("detect", help="cache → events.json(純 CPU)")
@@ -241,11 +276,38 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--debug", action="store_true", help="輸出 per-frame 特徵 JSONL")
     p.set_defaults(func=cmd_pipeline)
 
+    p = sub.add_parser(
+        "evaluate", help="從 Keypoint Cache 重現 test split 的 event-level 指標"
+    )
+    p.add_argument(
+        "--cache-root",
+        required=True,
+        help="模型快取根目錄，例如 cache/yolo26n-pose/*.parquet",
+    )
+    p.add_argument("--annotations", required=True, help="URFD fall annotations CSV")
+    p.add_argument("--splits", default="eval/splits.yaml")
+    p.add_argument("--config", default="config.yaml")
+    p.add_argument(
+        "--model",
+        action="append",
+        default=None,
+        help="快取子目錄名稱，可重複指定；預設評估 yolo26n-pose 與 yolo26s-pose",
+    )
+    p.add_argument("--tol-s", type=float, default=0.5, dest="tol_s")
+    p.add_argument("--out", default="outputs/evaluation.json")
+    p.set_defaults(func=cmd_evaluate)
+
     p = sub.add_parser("bench", help="影片 → FPS benchmark(可攜,任何機器都能補跑)")
     p.add_argument("--video", required=True, help="固定用來計時的影片")
-    p.add_argument("--model", action="append", required=True, help="模型名,可重複指定多次")
-    p.add_argument("--device", default=None, help="cuda:0 / cpu(預設由 ultralytics 自選)")
-    p.add_argument("--quantize", default=None, help="16 或 fp16 啟用 FP16 推論(僅 GPU 有意義)")
+    p.add_argument(
+        "--model", action="append", required=True, help="模型名,可重複指定多次"
+    )
+    p.add_argument(
+        "--device", default=None, help="cuda:0 / cpu(預設由 ultralytics 自選)"
+    )
+    p.add_argument(
+        "--quantize", default=None, help="16 或 fp16 啟用 FP16 推論(僅 GPU 有意義)"
+    )
     p.add_argument("--n-frames", type=int, default=300, dest="n_frames")
     p.add_argument("--n-runs", type=int, default=3, dest="n_runs")
     p.add_argument("--warmup", type=int, default=20)
@@ -255,7 +317,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _configure_utf8_stdio() -> None:
+    """Keep Traditional Chinese CLI output readable on Windows consoles."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def main(argv: list[str] | None = None) -> int:
+    _configure_utf8_stdio()
     args = build_parser().parse_args(argv)
     return args.func(args)
 

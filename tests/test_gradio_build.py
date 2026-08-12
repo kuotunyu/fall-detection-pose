@@ -9,8 +9,7 @@ def test_build_demo_contains_named_state_groups():
     demo = build_demo()
     config = demo.get_config_file()
     ids = {
-        component.get("props", {}).get("elem_id")
-        for component in config["components"]
+        component.get("props", {}).get("elem_id") for component in config["components"]
     }
 
     assert {"fd-input", "fd-processing", "fd-result", "fd-error"} <= ids

@@ -184,7 +184,13 @@ def list_failure_cases(metrics: dict) -> dict:
         unmatched_preds = [p for p in preds if p not in matched_preds]
         unmatched_gts = [g for g in gts if g not in matched_gts]
         if unmatched_preds:
-            fp_cases.append({"name": v["name"], "is_adl": v["is_adl"], "fp_intervals": unmatched_preds})
+            fp_cases.append(
+                {
+                    "name": v["name"],
+                    "is_adl": v["is_adl"],
+                    "fp_intervals": unmatched_preds,
+                }
+            )
         if unmatched_gts:
             fn_cases.append({"name": v["name"], "fn_intervals": unmatched_gts})
     return {"fp_cases": fp_cases, "fn_cases": fn_cases}

@@ -99,7 +99,9 @@ class _TrackRunner:
         debug: list | None,
     ) -> None:
         r = cfg.rules
-        geo = compute_frame_geometry(kpts_xy, kpts_conf, np.asarray(bbox), cfg.model.kpt_conf_min)
+        geo = compute_frame_geometry(
+            kpts_xy, kpts_conf, np.asarray(bbox), cfg.model.kpt_conf_min
+        )
 
         if geo.valid:
             l_tilde = self.torso_med.push(geo.torso_len)
@@ -247,7 +249,9 @@ def run_engine(
         # 先更新既有 track,再處理新 track:避免把「本幀仍活著的 track」誤當縫合對象
         existing = [row for row in rows if int(row.track_id) in runners]
         newcomers = [
-            row for row in rows if int(row.track_id) >= 0 and int(row.track_id) not in runners
+            row
+            for row in rows
+            if int(row.track_id) >= 0 and int(row.track_id) not in runners
         ]
 
         for row in existing:
@@ -262,7 +266,16 @@ def run_engine(
                 events_raw.extend(runner.fsm.finalize())
                 runner = _TrackRunner(cfg, fps, FallStateMachine(r, tid))
                 runners[tid] = runner
-            runner.step(cfg, tid, int(row.frame_idx), t_s, _bbox(row), row.kpts_xy, row.kpts_conf, debug)
+            runner.step(
+                cfg,
+                tid,
+                int(row.frame_idx),
+                t_s,
+                _bbox(row),
+                row.kpts_xy,
+                row.kpts_conf,
+                debug,
+            )
 
         for row in newcomers:
             tid = int(row.track_id)
@@ -283,7 +296,16 @@ def run_engine(
             else:
                 runner = _TrackRunner(cfg, fps, FallStateMachine(r, tid))
             runners[tid] = runner
-            runner.step(cfg, tid, int(row.frame_idx), t_s, bbox, row.kpts_xy, row.kpts_conf, debug)
+            runner.step(
+                cfg,
+                tid,
+                int(row.frame_idx),
+                t_s,
+                bbox,
+                row.kpts_xy,
+                row.kpts_conf,
+                debug,
+            )
 
         # 清掃:超過各自可容忍等待時間的 runner 終結。FALLING/FALLEN 用加長版窗,
         # 否則會在縫合視窗生效前就被這裡提前終結(見 _lost_window_for)。
@@ -291,7 +313,8 @@ def run_engine(
         stale = [
             tid
             for tid, ru in runners.items()
-            if ru.last_t is not None and ru.last_t < t_frame - _lost_window_for(ru, r, base)
+            if ru.last_t is not None
+            and ru.last_t < t_frame - _lost_window_for(ru, r, base)
         ]
         for tid in stale:
             events_raw.extend(runners.pop(tid).fsm.finalize())

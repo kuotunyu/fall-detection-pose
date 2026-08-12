@@ -20,5 +20,18 @@
 > depth maps and wireless accelerometer," *Computer Methods and Programs in
 > Biomedicine*, 2014. <https://doi.org/10.1016/j.cmpb.2014.09.005>
 
-除上述第三方資料與衍生媒體外，本 repository 的原始程式碼依
-[MIT License](LICENSE) 釋出。
+## Ultralytics 與 YOLO 權重
+
+本專案的 `infer` extra 會安裝 [Ultralytics](https://github.com/ultralytics/ultralytics)，
+並於首次推論時下載官方 YOLO26-pose 預訓練權重。本 repository 不重新散布
+Ultralytics 套件或模型權重。
+
+依 [Ultralytics 官方授權說明](https://www.ultralytics.com/license)，其開源軟體及
+官方訓練模型預設適用 **AGPL-3.0**；若要整合至商業或封閉原始碼產品，使用者應
+另行確認 Ultralytics Enterprise License 等適用條款。這些第三方元件不屬於本
+repository 的 MIT License 授權範圍。
+
+## 本專案原始程式碼
+
+本 repository 由專案作者撰寫的原始程式碼依 [MIT License](LICENSE) 釋出。
+所有第三方套件、模型權重、資料集與衍生媒體仍各自適用其原始授權條款。

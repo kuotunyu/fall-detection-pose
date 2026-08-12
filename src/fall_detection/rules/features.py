@@ -27,7 +27,9 @@ class FrameGeometry:
 
     valid: bool
     theta_deg: float = float("nan")  # 軀幹傾角:0=直立、90=橫臥(頭低於髖時 clamp 90)
-    torso_len: float = float("nan")  # 肩中點-髖中點距離(像素);引擎以其滑動中位數 L̃ 作尺度
+    torso_len: float = float(
+        "nan"
+    )  # 肩中點-髖中點距離(像素);引擎以其滑動中位數 L̃ 作尺度
     bbox_aspect: float = float("nan")  # bbox 寬/高
     hip_y: float = float("nan")  # 髖中點 y(像素)
     ankle_valid: bool = False

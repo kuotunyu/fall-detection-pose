@@ -10,11 +10,16 @@ def test_constructor_closes_mkstemp_file_descriptor(monkeypatch, tmp_path):
     fake_writer.isOpened.return_value = True
     close_fd = Mock()
     monkeypatch.setattr(
-        "fall_detection.io.video.tempfile.mkstemp", lambda **_kwargs: (47, str(temp_path))
+        "fall_detection.io.video.tempfile.mkstemp",
+        lambda **_kwargs: (47, str(temp_path)),
     )
     monkeypatch.setattr("fall_detection.io.video.os.close", close_fd)
-    monkeypatch.setattr("fall_detection.io.video.cv2.VideoWriter", Mock(return_value=fake_writer))
-    monkeypatch.setattr("fall_detection.io.video.cv2.VideoWriter_fourcc", Mock(return_value=0))
+    monkeypatch.setattr(
+        "fall_detection.io.video.cv2.VideoWriter", Mock(return_value=fake_writer)
+    )
+    monkeypatch.setattr(
+        "fall_detection.io.video.cv2.VideoWriter_fourcc", Mock(return_value=0)
+    )
 
     H264VideoWriter(tmp_path / "output.mp4", 30.0, 640, 480)
 

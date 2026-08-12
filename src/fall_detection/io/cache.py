@@ -98,7 +98,9 @@ def read_cache(path: str | Path) -> tuple[pd.DataFrame, CacheMeta]:
     if raw is None:
         sidecar = _sidecar_path(path)
         if not sidecar.exists():
-            raise CacheSchemaError(f"{path} 缺少中繼資料(parquet metadata 與 sidecar 皆無)")
+            raise CacheSchemaError(
+                f"{path} 缺少中繼資料(parquet metadata 與 sidecar 皆無)"
+            )
         raw = sidecar.read_text(encoding="utf-8")
     meta = CacheMeta(**json.loads(raw))
     if meta.schema_version != SCHEMA_VERSION:

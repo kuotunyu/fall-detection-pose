@@ -86,11 +86,19 @@ def events_to_json_dict(
 
 
 def write_events_json(
-    path: str | Path, events: list[FallEvent], source: str, fps: float, extra: dict | None = None
+    path: str | Path,
+    events: list[FallEvent],
+    source: str,
+    fps: float,
+    extra: dict | None = None,
 ) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(events_to_json_dict(events, source, fps, extra), ensure_ascii=False, indent=2),
+        json.dumps(
+            events_to_json_dict(events, source, fps, extra),
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )

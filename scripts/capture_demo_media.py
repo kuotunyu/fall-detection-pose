@@ -26,14 +26,16 @@ def capture(
         page = browser.new_page(viewport=viewport)
         page.on(
             "console",
-            lambda message: console_errors.append(message.text)
-            if message.type == "error"
-            else None,
+            lambda message: (
+                console_errors.append(message.text) if message.type == "error" else None
+            ),
         )
         page.goto(url, wait_until="domcontentloaded")
         page.locator("#fd-input").first.wait_for(state="visible")
         if video is not None:
-            page.locator("#fd-input input[type=file]").set_input_files(str(video.resolve()))
+            page.locator("#fd-input input[type=file]").set_input_files(
+                str(video.resolve())
+            )
             page.get_by_role("button", name="開始分析").click()
             page.locator("#fd-processing").first.wait_for(state="visible")
             page.locator("#fd-result").first.wait_for(
@@ -86,7 +88,9 @@ def capture_result_frames(
         page.locator("#fd-result").first.wait_for(state="visible", timeout=timeout_ms)
         result = page.locator("#fd-result").first
         output_video = result.locator("video").first
-        output_video.evaluate("video => { video.currentTime = 0; video.muted = true; video.play(); }")
+        output_video.evaluate(
+            "video => { video.currentTime = 0; video.muted = true; video.play(); }"
+        )
         for index in range(frame_count):
             result.screenshot(path=str(out_dir / f"frame-{index:03d}.png"))
             page.wait_for_timeout(delay)

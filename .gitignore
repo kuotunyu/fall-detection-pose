@@ -1,4 +1,4 @@
-# 資料與產物一律不進 git(URFD 為 CC BY-NC-SA 4.0,不隨 repo 散布)
+# 資料與產物一律不進 git (URFD 為 CC BY-NC-SA 4.0, 不隨 repo 散布)
 data/
 cache/
 outputs/
@@ -17,6 +17,17 @@ dist/
 
 # 環境
 .env
+
+# Maintainer notes & local workspaces
+.agents/
+.claude/
+CLAUDE.md
+PLAN.md
+PROGRESS.md
+PROJECT_PLAN.md
+interview*.md
+INTERVIEW_PREP.md
+*.private.md
 
 # 本機設計腦力激盪與視覺 mockup 工作檔
 .superpowers/

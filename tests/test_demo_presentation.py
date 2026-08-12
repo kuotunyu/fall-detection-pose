@@ -188,6 +188,13 @@ def test_progress_view_maps_pipeline_stage_and_exact_frame_count():
     assert "87 / 150" in render_progress_html(view)
 
 
+def test_progress_view_starts_with_video_decode():
+    view = progress_view(0.02, "載入模型與影片")
+
+    assert view.stage == "DECODE"
+    assert view.title == "影片解碼"
+
+
 def test_progress_view_clamps_fraction():
     assert progress_view(1.5, "完成").percent == 100
     assert progress_view(-0.2, "準備中").percent == 0
@@ -208,3 +215,20 @@ def test_decode_error_has_actionable_copy():
 
     assert err.code == "VIDEO_DECODE_ERROR"
     assert err.title == "無法讀取這個影片"
+
+
+def test_result_exposes_pipeline_order():
+    payload = AnalysisPayload(
+        source_name="fall.mp4",
+        fps=30.0,
+        n_frames=100,
+        n_tracks=1,
+        events=(_event(rules=["lying_persisted"]),),
+    )
+
+    html = render_result_html(payload).html
+
+    assert "POSE" in html
+    assert "TRACK" in html
+    assert "RULES" in html
+    assert "EVENT" in html

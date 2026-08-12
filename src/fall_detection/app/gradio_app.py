@@ -174,49 +174,244 @@ def process_video(
     return str(annotated_path), rows, str(events_path)
 
 
-def build_demo(config_path: str = "config.yaml", example_videos: list[str] | None = None):
-    """組出 ``gr.Blocks`` demo(不呼叫 ``launch()``,方便 notebook/測試各自決定)。"""
+def build_demo(
+    config_path: str = "config.yaml",
+    example_videos: list[str] | None = None,
+    *,
+    runner: Callable | None = None,
+):
+    """建立四狀態的科學式 Gradio 分析介面；呼叫端自行決定何時 ``launch()``。"""
     import gradio as gr
 
-    with gr.Blocks(title="跌倒偵測 Demo") as demo:
-        gr.Markdown(
-            "# 跌倒偵測 Demo\n"
-            "YOLO26-pose + ByteTrack + 規則式狀態機(不訓練模型,純規則引擎判定)。"
-            "上傳一支影片,輸出標註影片(骨架 + track id + 狀態 + ALARM 橫幅)與"
-            "偵測到的跌倒事件表。首次執行需下載模型權重,請稍候。\n\n"
-            "評估協定、閾值理由與失敗案例分析均收錄於專案 README。"
-        )
-        with gr.Row():
-            with gr.Column():
-                video_in = gr.Video(sources=["upload"], label="上傳影片")
-                model_in = gr.Dropdown(
-                    DEFAULT_MODEL_CHOICES,
-                    value=DEFAULT_MODEL_CHOICES[0],
-                    label="模型(n=快、s=較準,見 README 評估表)",
+    from .presentation import (
+        load_analysis_payload,
+        load_evidence,
+        progress_view,
+        render_error_html,
+        render_evidence_html,
+        render_progress_html,
+        render_result_html,
+        safe_error,
+    )
+    from .theme import APP_HEADER_HTML, DEMO_CSS
+
+    project_root = Path(config_path).resolve().parent
+    evidence_html = render_evidence_html(load_evidence(project_root))
+    section_title = (
+        '<div class="fd-section-title"><h2>影片分析工作區</h2>'
+        '<p>上傳短片後，系統依序執行姿態估計、Track 關聯與事件規則。</p></div>'
+    )
+
+    with gr.Blocks(
+        title="姿態追蹤式跌倒事件偵測",
+        fill_width=True,
+    ) as demo:
+        gr.HTML(f"<style>{DEMO_CSS}</style>", container=False, visible="hidden")
+        gr.HTML(APP_HEADER_HTML, container=False)
+        if evidence_html:
+            gr.HTML(evidence_html, container=False)
+
+        with gr.Group(
+            visible=True,
+            elem_id="fd-input",
+            elem_classes=["fd-state"],
+        ) as input_group:
+            gr.HTML(section_title, container=False)
+            with gr.Row(elem_classes=["fd-input-grid"]):
+                video_in = gr.Video(
+                    sources=["upload"],
+                    label="拖放一個短片",
+                    elem_classes=["fd-upload"],
                 )
-                run_btn = gr.Button("開始偵測", variant="primary")
-                if example_videos:
-                    gr.Examples(examples=[[p] for p in example_videos], inputs=[video_in])
-            with gr.Column():
-                video_out = gr.Video(label="標註結果")
-                table_out = gr.Dataframe(headers=EVENT_TABLE_HEADERS, label="偵測到的跌倒事件")
-                file_out = gr.File(label="下載 events.json")
+                with gr.Column(min_width=310):
+                    gr.HTML(
+                        '<div class="fd-input-copy"><small>INPUT</small>'
+                        '<h3>選擇待分析影片</h3>'
+                        '<p>支援 MP4、MOV。建議使用 5–20 秒且人物全身可見的短片；單檔上限 200 MB。</p>'
+                        '<dl><div><dt>輸出</dt><dd>標註影片</dd></div>'
+                        '<div><dt>事件資料</dt><dd>events.json</dd></div></dl></div>',
+                        container=False,
+                    )
+                    with gr.Accordion("進階設定", open=False):
+                        model_in = gr.Dropdown(
+                            DEFAULT_MODEL_CHOICES,
+                            value=DEFAULT_MODEL_CHOICES[0],
+                            label="Pose model",
+                        )
+                    run_btn = gr.Button(
+                        "開始分析",
+                        variant="primary",
+                        elem_classes=["fd-primary"],
+                    )
+            if example_videos:
+                gr.Examples(
+                    examples=[[path] for path in example_videos],
+                    inputs=[video_in],
+                    label="內建範例",
+                    example_labels=["跌倒事件", "日常活動"][: len(example_videos)],
+                )
 
-        def _handler(video_path, model_name, progress=gr.Progress()):
-            def on_progress(frac: float, desc: str) -> None:
-                progress(frac, desc=desc)
+        with gr.Group(
+            visible=False,
+            elem_id="fd-processing",
+            elem_classes=["fd-state"],
+        ) as processing_group:
+            progress_html = gr.HTML(
+                render_progress_html(progress_view(0.0, "準備分析")),
+                container=False,
+            )
 
-            try:
-                return process_video(video_path, model_name, config_path, on_progress=on_progress)
-            except Exception as e:  # noqa: BLE001 - demo 是 share=True 公開端點,任何輸入都不能讓伺服器整個炸掉
-                raise gr.Error(f"處理失敗:{e}") from e
+        with gr.Group(
+            visible=False,
+            elem_id="fd-result",
+            elem_classes=["fd-state"],
+        ) as result_group:
+            gr.HTML(section_title, container=False)
+            with gr.Row(elem_classes=["fd-workspace"]):
+                video_out = gr.Video(
+                    label="標註影片",
+                    interactive=False,
+                    buttons=["download"],
+                    elem_classes=["fd-video"],
+                )
+                result_html = gr.HTML(
+                    '<div class="fd-result-placeholder"></div>',
+                    container=False,
+                    elem_classes=["fd-result-html"],
+                )
+            with gr.Row(elem_classes=["fd-output-actions"]):
+                result_video_in = gr.File(
+                    label="拖放另一個短片",
+                    file_types=["video"],
+                    type="filepath",
+                    height=74,
+                    elem_classes=["fd-replace"],
+                )
+                file_out = gr.File(
+                    label="下載 events.json",
+                    interactive=False,
+                    elem_classes=["fd-file"],
+                )
 
-        run_btn.click(
-            fn=_handler,
-            inputs=[video_in, model_in],
-            outputs=[video_out, table_out, file_out],
-            concurrency_limit=1,
-        )
+        with gr.Group(
+            visible=False,
+            elem_id="fd-error",
+            elem_classes=["fd-state"],
+        ) as error_group:
+            error_html = gr.HTML(
+                render_error_html(safe_error(RuntimeError())),
+                container=False,
+            )
+            error_video_in = gr.File(
+                label="拖放另一個短片",
+                file_types=["video"],
+                type="filepath",
+                height=74,
+                elem_classes=["fd-replace", "fd-output-actions"],
+            )
+
+        outputs = [
+            input_group,
+            processing_group,
+            result_group,
+            error_group,
+            progress_html,
+            video_out,
+            result_html,
+            file_out,
+            error_html,
+        ]
+
+        def _handler(video_path, model_name):
+            if not video_path:
+                error = safe_error(ValueError("尚未選擇 video"))
+                yield (
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                    gr.update(visible=True),
+                    gr.update(),
+                    None,
+                    "",
+                    None,
+                    render_error_html(error),
+                )
+                return
+
+            yield (
+                gr.update(visible=False),
+                gr.update(visible=True),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                render_progress_html(progress_view(0.0, "準備分析")),
+                None,
+                "",
+                None,
+                gr.update(),
+            )
+            for message in _stream_process(
+                video_path,
+                model_name,
+                config_path,
+                runner=runner,
+            ):
+                if message.kind == "progress":
+                    yield (
+                        gr.update(visible=False),
+                        gr.update(visible=True),
+                        gr.update(visible=False),
+                        gr.update(visible=False),
+                        render_progress_html(
+                            progress_view(message.fraction, message.description)
+                        ),
+                        gr.update(),
+                        gr.update(),
+                        gr.update(),
+                        gr.update(),
+                    )
+                elif message.kind == "success":
+                    try:
+                        payload = load_analysis_payload(message.events_path)
+                        result = render_result_html(payload)
+                    except Exception as exc:  # noqa: BLE001 - mapped to safe UI copy below
+                        message = StreamMessage(kind="error", error=exc)
+                    else:
+                        yield (
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            gr.update(visible=True),
+                            gr.update(visible=False),
+                            gr.update(),
+                            message.annotated_path,
+                            result.html,
+                            message.events_path,
+                            gr.update(),
+                        )
+                        continue
+                if message.kind == "error":
+                    error = safe_error(message.error or RuntimeError())
+                    yield (
+                        gr.update(visible=False),
+                        gr.update(visible=False),
+                        gr.update(visible=False),
+                        gr.update(visible=True),
+                        gr.update(),
+                        None,
+                        "",
+                        None,
+                        render_error_html(error),
+                    )
+
+        event_kwargs = {
+            "fn": _handler,
+            "outputs": outputs,
+            "concurrency_limit": 1,
+            "show_progress": "hidden",
+            "scroll_to_output": True,
+        }
+        run_btn.click(inputs=[video_in, model_in], **event_kwargs)
+        result_video_in.change(inputs=[result_video_in, model_in], **event_kwargs)
+        error_video_in.change(inputs=[error_video_in, model_in], **event_kwargs)
     return demo
 
 
@@ -233,8 +428,13 @@ def main() -> None:
     args = parser.parse_args()
 
     demo = build_demo(config_path=args.config, example_videos=args.examples)
+    from .theme import DEMO_CSS
+
     demo.queue().launch(
-        share=not args.no_share, max_file_size="200mb", server_port=args.server_port
+        share=not args.no_share,
+        max_file_size="200mb",
+        server_port=args.server_port,
+        css=DEMO_CSS,
     )
 
 

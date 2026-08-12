@@ -124,7 +124,9 @@ def progress_view(fraction: float, description: str) -> ProgressView:
     description = str(description)
     frame_match = re.search(r"(\d+)\s*/\s*(\d+)", description)
     detail = f"frame {frame_match.group(1)} / {frame_match.group(2)}" if frame_match else description
-    if "姿態" in description or fraction < 0.72:
+    if fraction < 0.05:
+        stage, title = "DECODE", "影片解碼"
+    elif "姿態" in description or fraction < 0.72:
         stage, title = "POSE", "Pose extraction"
     elif "規則" in description or fraction < 0.82:
         stage, title = "RULES", "Event detection"
@@ -222,7 +224,10 @@ def render_result_html(payload: AnalysisPayload) -> ResultView:
     body = (
         '<section class="fd-result-panel">'
         f'<div class="fd-source"><span>{source}</span><span>{payload.fps:g} FPS</span></div>'
-        f'<div class="fd-events">{events}</div></section>'
+        f'<div class="fd-events">{events}</div>'
+        '<ol class="fd-pipeline" aria-label="處理流程">'
+        '<li>POSE</li><li>TRACK</li><li>RULES</li><li>EVENT</li>'
+        '</ol></section>'
     )
     return ResultView(body, True, state)
 

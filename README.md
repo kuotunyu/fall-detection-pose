@@ -181,15 +181,13 @@ Keypoint Cache 是 GPU inference 與 CPU rule engine 之間的穩定介面。Par
 以下時序對應 Demo 與 `fdp pipeline` 的實際呼叫邊界；模型只負責產生可重用的姿態資料，是否形成事件則由後續規則引擎決定。
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'primaryColor': '#DDE8E2', 'primaryTextColor': '#20352D', 'primaryBorderColor': '#587066', 'lineColor': '#66756F', 'actorBkg': '#EBE5D9', 'actorBorder': '#7C715F', 'actorTextColor': '#25342F', 'signalColor': '#43564F', 'signalTextColor': '#25342F', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
+%%{init: {'theme': 'base', 'sequence': {'diagramMarginX': 12, 'actorMargin': 28, 'width': 150, 'messageMargin': 30, 'noteMargin': 8, 'mirrorActors': false}, 'themeVariables': {'fontSize': '19px', 'fontFamily': 'Arial, sans-serif', 'primaryColor': '#DDE8E2', 'primaryTextColor': '#20352D', 'primaryBorderColor': '#587066', 'lineColor': '#66756F', 'actorBkg': '#EBE5D9', 'actorBorder': '#7C715F', 'actorTextColor': '#25342F', 'signalColor': '#43564F', 'signalTextColor': '#25342F', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
 sequenceDiagram
     autonumber
-    actor User as 使用者
-    participant Pipeline as Gradio Demo / CLI
+    participant Pipeline as Demo / CLI
     participant GPU as Pose + Tracking
-    participant CPU as CPU Decision Pipeline
+    participant CPU as CPU Rule Engine
 
-    User->>Pipeline: 提交短片與模型設定
     Pipeline->>GPU: extract_video(video, config)
     loop 每個 frame
         GPU->>GPU: YOLO26-pose + ByteTrack
@@ -200,42 +198,35 @@ sequenceDiagram
         CPU->>CPU: 特徵平滑 → FSM tick → finalize
     end
     CPU-->>Pipeline: FallEvent[] + debug records
-    par 產生標註影片
-        Pipeline->>Pipeline: annotate_video(...)
-    and 保存可稽核證據
-        Pipeline->>Pipeline: write_events_json(...)
-    end
-    Pipeline-->>User: H.264 MP4 + 事件摘要 + events.json
+    Pipeline->>Pipeline: annotate_video(...)
+    Pipeline->>Pipeline: write_events_json(...)
+    Note over Pipeline,CPU: 輸出：H.264 MP4 · 事件摘要 · events.json
 ```
 
 ### Track-level 狀態機
 
+每個 Track ID 依 `UPRIGHT → FALLING → FALLEN → ALARM` 演進；`FallEvent` 是狀態機完成判定後輸出的可稽核事件紀錄。
+
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
+%%{init: {'theme': 'base', 'htmlLabels': false, 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
 stateDiagram-v2
     direction TB
-    state "UPRIGHT" as U
-    state "FALLING<br/>快速運動" as F
-    state "FALLEN<br/>躺姿確認" as L
-    state "ALARM<br/>事件成立" as A
-    state "FallEvent" as E
+    [*] --> UPRIGHT
+    UPRIGHT --> FALLING: v_norm > 0.8<br/>∨ omega > 90°/s
+    FALLING --> FALLEN: 躺姿投票 >= 80%
+    FALLING --> UPRIGHT: 未確認<br/>t = 1.2 s<br/>不輸出事件
+    FALLEN --> ALARM: 躺姿持續 >= 0.3 s
+    FALLEN --> UPRIGHT: 警示前持續回正<br/>不輸出事件
+    ALARM --> UPRIGHT: 回正持續 >= 0.5 s<br/>輸出 FallEvent
 
-    [*] --> U
-    U --> F: v_norm > 0.8<br/>或 omega > 90°/s
-    F --> L: 躺姿投票 >= 80%
-    F --> U: 1.2 s 內未確認<br/>不輸出事件
-    L --> A: 躺姿持續 >= 0.3 s
-    L --> U: 警示前持續回正<br/>不輸出事件
-    A --> U: 回正持續 >= 0.5 s<br/>輸出 FallEvent
+    FALLING --> FallEvent: track 結束<br/>且末次姿態為躺姿
+    FALLEN --> FallEvent: track 結束
+    ALARM --> FallEvent: track / 影片結束
+    FallEvent --> [*]
 
-    F --> E: track 結束<br/>且末次姿態為躺姿
-    L --> E: track 結束
-    A --> E: track / 影片結束
-    E --> [*]
-
-    note right of E
-        時間區間 · Track ID 鏈
-        peak_features · rules_fired
+    note right of FallEvent
+        區間 · Track IDs
+        特徵峰值 · 觸發規則
     end note
 
     classDef upright fill:#DDE8E2,stroke:#587066,stroke-width:1.5px,color:#20352D
@@ -244,11 +235,11 @@ stateDiagram-v2
     classDef alarm fill:#F0D8D2,stroke:#A25D50,stroke-width:2px,color:#472923
     classDef event fill:#DCE6EC,stroke:#5E7480,stroke-width:1.5px,color:#21343C
 
-    class U upright
-    class F falling
-    class L fallen
-    class A alarm
-    class E event
+    class UPRIGHT upright
+    class FALLING falling
+    class FALLEN fallen
+    class ALARM alarm
+    class FallEvent event
 ```
 
 每個 Track ID 都有獨立狀態，不會因另一個人觸發警示而共用事件。影片結束或 track 消失時，finalization 會依最後狀態決定是否輸出事件，處理跌倒後片段立即結束的情況。

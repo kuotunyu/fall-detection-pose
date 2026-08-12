@@ -183,15 +183,13 @@ The Keypoint Cache is the stable boundary between GPU inference and the CPU rule
 This sequence matches the actual call boundaries used by the Demo and `fdp pipeline`. The model produces reusable pose data; the downstream rule engine independently decides whether it constitutes a fall event.
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'primaryColor': '#DDE8E2', 'primaryTextColor': '#20352D', 'primaryBorderColor': '#587066', 'lineColor': '#66756F', 'actorBkg': '#EBE5D9', 'actorBorder': '#7C715F', 'actorTextColor': '#25342F', 'signalColor': '#43564F', 'signalTextColor': '#25342F', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
+%%{init: {'theme': 'base', 'sequence': {'diagramMarginX': 12, 'actorMargin': 28, 'width': 150, 'messageMargin': 30, 'noteMargin': 8, 'mirrorActors': false}, 'themeVariables': {'fontSize': '19px', 'fontFamily': 'Arial, sans-serif', 'primaryColor': '#DDE8E2', 'primaryTextColor': '#20352D', 'primaryBorderColor': '#587066', 'lineColor': '#66756F', 'actorBkg': '#EBE5D9', 'actorBorder': '#7C715F', 'actorTextColor': '#25342F', 'signalColor': '#43564F', 'signalTextColor': '#25342F', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
 sequenceDiagram
     autonumber
-    actor User
-    participant Pipeline as Gradio Demo / CLI
+    participant Pipeline as Demo / CLI
     participant GPU as Pose + Tracking
-    participant CPU as CPU Decision Pipeline
+    participant CPU as CPU Rule Engine
 
-    User->>Pipeline: Submit clip and model configuration
     Pipeline->>GPU: extract_video(video, config)
     loop Each frame
         GPU->>GPU: YOLO26-pose + ByteTrack
@@ -202,42 +200,35 @@ sequenceDiagram
         CPU->>CPU: Feature smoothing → FSM tick → finalize
     end
     CPU-->>Pipeline: FallEvent[] + debug records
-    par Render annotated video
-        Pipeline->>Pipeline: annotate_video(...)
-    and Persist auditable evidence
-        Pipeline->>Pipeline: write_events_json(...)
-    end
-    Pipeline-->>User: H.264 MP4 + event summary + events.json
+    Pipeline->>Pipeline: annotate_video(...)
+    Pipeline->>Pipeline: write_events_json(...)
+    Note over Pipeline,CPU: Output: H.264 MP4 · event summary · events.json
 ```
 
 ### Track-level state machine
 
+Each Track ID progresses through `UPRIGHT → FALLING → FALLEN → ALARM`; `FallEvent` is the auditable event record emitted after the state machine finalizes its decision.
+
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
+%%{init: {'theme': 'base', 'htmlLabels': false, 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
 stateDiagram-v2
     direction TB
-    state "UPRIGHT" as U
-    state "FALLING<br/>rapid motion" as F
-    state "FALLEN<br/>lying confirmed" as L
-    state "ALARM<br/>event confirmed" as A
-    state "FallEvent" as E
+    [*] --> UPRIGHT
+    UPRIGHT --> FALLING: v_norm > 0.8<br/>or omega > 90°/s
+    FALLING --> FALLEN: lying-posture vote >= 80%
+    FALLING --> UPRIGHT: unconfirmed<br/>at t = 1.2 s<br/>no event
+    FALLEN --> ALARM: lying persists >= 0.3 s
+    FALLEN --> UPRIGHT: recovery before alarm<br/>no event emitted
+    ALARM --> UPRIGHT: upright persists >= 0.5 s<br/>emit FallEvent
 
-    [*] --> U
-    U --> F: v_norm > 0.8<br/>or omega > 90°/s
-    F --> L: lying-posture vote >= 80%
-    F --> U: unconfirmed after 1.2 s<br/>no event emitted
-    L --> A: lying persists >= 0.3 s
-    L --> U: recovery before alarm<br/>no event emitted
-    A --> U: upright persists >= 0.5 s<br/>emit FallEvent
+    FALLING --> FallEvent: track ends<br/>with a final lying posture
+    FALLEN --> FallEvent: track ends
+    ALARM --> FallEvent: track / video ends
+    FallEvent --> [*]
 
-    F --> E: track ends<br/>with a final lying posture
-    L --> E: track ends
-    A --> E: track / video ends
-    E --> [*]
-
-    note right of E
-        Time interval · Track ID chain
-        peak_features · rules_fired
+    note right of FallEvent
+        Interval · Track IDs
+        Peaks · fired rules
     end note
 
     classDef upright fill:#DDE8E2,stroke:#587066,stroke-width:1.5px,color:#20352D
@@ -246,11 +237,11 @@ stateDiagram-v2
     classDef alarm fill:#F0D8D2,stroke:#A25D50,stroke-width:2px,color:#472923
     classDef event fill:#DCE6EC,stroke:#5E7480,stroke-width:1.5px,color:#21343C
 
-    class U upright
-    class F falling
-    class L fallen
-    class A alarm
-    class E event
+    class UPRIGHT upright
+    class FALLING falling
+    class FALLEN fallen
+    class ALARM alarm
+    class FallEvent event
 ```
 
 Each Track ID owns an independent state, so one person cannot trigger another person's event. When a video ends or a track disappears, finalization uses the last state and posture to decide whether an event should be emitted, covering clips that end immediately after a fall.

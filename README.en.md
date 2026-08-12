@@ -183,7 +183,7 @@ The Keypoint Cache is the stable boundary between GPU inference and the CPU rule
 This sequence matches the actual call boundaries used by the Demo and `fdp pipeline`. The model produces reusable pose data; the downstream rule engine independently decides whether it constitutes a fall event.
 
 ```mermaid
-%%{init: {'theme': 'base', 'sequence': {'diagramMarginX': 12, 'actorMargin': 28, 'width': 150, 'messageMargin': 30, 'noteMargin': 8, 'mirrorActors': false}, 'themeVariables': {'fontSize': '19px', 'fontFamily': 'Arial, sans-serif', 'primaryColor': '#DDE8E2', 'primaryTextColor': '#20352D', 'primaryBorderColor': '#587066', 'lineColor': '#66756F', 'actorBkg': '#EBE5D9', 'actorBorder': '#7C715F', 'actorTextColor': '#25342F', 'signalColor': '#43564F', 'signalTextColor': '#25342F', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
+%%{init: {'theme': 'base', 'sequence': {'diagramMarginX': 12, 'actorMargin': 28, 'width': 150, 'messageMargin': 32, 'noteMargin': 8, 'mirrorActors': false, 'actorFontSize': 18, 'messageFontSize': 17, 'noteFontSize': 17}, 'themeVariables': {'fontFamily': 'Arial, sans-serif', 'primaryColor': '#DDE8E2', 'primaryTextColor': '#20352D', 'primaryBorderColor': '#587066', 'lineColor': '#66756F', 'actorBkg': '#EBE5D9', 'actorBorder': '#7C715F', 'actorTextColor': '#25342F', 'signalColor': '#43564F', 'signalTextColor': '#25342F', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
 sequenceDiagram
     autonumber
     participant Pipeline as Demo / CLI
@@ -213,6 +213,12 @@ Each Track ID progresses through `UPRIGHT → FALLING → FALLEN → ALARM`; `Fa
 %%{init: {'theme': 'base', 'htmlLabels': false, 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
 stateDiagram-v2
     direction TB
+    %% En spaces compensate for GitHub's state-node text metrics.
+    state " UPRIGHT " as UPRIGHT
+    state " FALLING " as FALLING
+    state " FALLEN " as FALLEN
+    state " ALARM " as ALARM
+    state " FallEvent " as FallEvent
     [*] --> UPRIGHT
     UPRIGHT --> FALLING: v_norm > 0.8<br/>or omega > 90°/s
     FALLING --> FALLEN: lying-posture vote >= 80%

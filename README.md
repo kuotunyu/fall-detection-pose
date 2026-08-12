@@ -181,7 +181,7 @@ Keypoint Cache 是 GPU inference 與 CPU rule engine 之間的穩定介面。Par
 以下時序對應 Demo 與 `fdp pipeline` 的實際呼叫邊界；模型只負責產生可重用的姿態資料，是否形成事件則由後續規則引擎決定。
 
 ```mermaid
-%%{init: {'theme': 'base', 'sequence': {'diagramMarginX': 12, 'actorMargin': 28, 'width': 150, 'messageMargin': 30, 'noteMargin': 8, 'mirrorActors': false}, 'themeVariables': {'fontSize': '19px', 'fontFamily': 'Arial, sans-serif', 'primaryColor': '#DDE8E2', 'primaryTextColor': '#20352D', 'primaryBorderColor': '#587066', 'lineColor': '#66756F', 'actorBkg': '#EBE5D9', 'actorBorder': '#7C715F', 'actorTextColor': '#25342F', 'signalColor': '#43564F', 'signalTextColor': '#25342F', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
+%%{init: {'theme': 'base', 'sequence': {'diagramMarginX': 12, 'actorMargin': 28, 'width': 150, 'messageMargin': 32, 'noteMargin': 8, 'mirrorActors': false, 'actorFontSize': 18, 'messageFontSize': 17, 'noteFontSize': 17}, 'themeVariables': {'fontFamily': 'Arial, sans-serif', 'primaryColor': '#DDE8E2', 'primaryTextColor': '#20352D', 'primaryBorderColor': '#587066', 'lineColor': '#66756F', 'actorBkg': '#EBE5D9', 'actorBorder': '#7C715F', 'actorTextColor': '#25342F', 'signalColor': '#43564F', 'signalTextColor': '#25342F', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
 sequenceDiagram
     autonumber
     participant Pipeline as Demo / CLI
@@ -211,6 +211,12 @@ sequenceDiagram
 %%{init: {'theme': 'base', 'htmlLabels': false, 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F', 'primaryTextColor': '#25342F', 'edgeLabelBackground': '#FAF9F6', 'noteBkgColor': '#EFE2CC', 'noteBorderColor': '#8C7452', 'noteTextColor': '#382F23'}}}%%
 stateDiagram-v2
     direction TB
+    %% En spaces compensate for GitHub's state-node text metrics.
+    state " UPRIGHT " as UPRIGHT
+    state " FALLING " as FALLING
+    state " FALLEN " as FALLEN
+    state " ALARM " as ALARM
+    state " FallEvent " as FallEvent
     [*] --> UPRIGHT
     UPRIGHT --> FALLING: v_norm > 0.8<br/>∨ omega > 90°/s
     FALLING --> FALLEN: 躺姿投票 >= 80%

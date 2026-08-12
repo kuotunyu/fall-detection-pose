@@ -117,10 +117,9 @@ def process_video(
 ) -> tuple[str, list[list], str]:
     """上傳影片 → (標註影片路徑, 事件表格 rows, events.json 路徑)。
 
-    固定用同一個工作目錄(每次呼叫覆寫上一次的輸出),不是每次呼叫都開新的
-    ``mkdtemp``:demo 的 ``concurrency_limit=1`` 保證不會有兩個請求同時寫入,
-    這在 Colab 這種一次性 session 裡無關緊要,但這個 app 也會部署成長時間跑的
-    HF Space,每次呼叫都留一份新暫存檔會讓磁碟用量無界成長。
+    固定使用同一個工作目錄（每次呼叫覆寫上一次的輸出），避免反覆建立
+    ``mkdtemp``。Demo 的 ``concurrency_limit=1`` 保證不會有兩個請求同時寫入；
+    對長時間執行的本機或託管環境而言，這也能避免暫存檔持續累積。
     """
     if not video_path:
         raise ValueError("請先上傳影片")

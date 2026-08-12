@@ -1,8 +1,7 @@
 """bench.benchmark 的純函式測試(不碰 torch/ultralytics/cv2)。
 
-``PoseTracker``/``load_frames`` 需要 infer extras 才能真正執行,只能在 Colab
-(GPU runtime)驗證;這裡只測試不依賴任何模型/影片的部分:百分位數計算、
-BenchResult 的序列化形狀。
+``PoseTracker``/``load_frames`` 需要 infer extras、模型權重與影片資源；這裡聚焦
+不依賴模型或影片的部分：百分位數計算與 BenchResult 的序列化形狀。
 """
 
 from fall_detection.bench.benchmark import BenchResult, _percentile

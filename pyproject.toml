@@ -42,7 +42,7 @@ Repository = "https://github.com/kuotunyu/fall-detection-pose"
 Issues = "https://github.com/kuotunyu/fall-detection-pose/issues"
 
 [project.optional-dependencies]
-# 推論相關(Colab GPU 環境安裝): pip install -e ".[infer]"
+# 本機或 CI 的 CPU/GPU 推論環境：pip install -e ".[infer]"
 infer = [
     "ultralytics>=8.4",     # YOLO26-pose 權重自 v8.4.0 起釋出
     "lap>=0.5.12",          # Ultralytics ByteTrack 線性指派；明確鎖定以避免執行期 AutoUpdate

@@ -1,9 +1,9 @@
 """app.gradio_app 的純函式測試(不碰 gradio/torch/ultralytics/cv2)。
 
-``build_demo``/``process_video`` 需要 gradio + infer extras 才能真正執行,只能在
-Colab 驗證;這裡只測試不依賴任何重依賴的部分:events dict → gr.Dataframe rows
-的轉換。模組頂層不 import gradio,所以這個 import 本身就是一項回歸測試——
-只要 gradio_app.py 不小心在頂層引了重依賴,這裡就會在本機輕量 venv 炸掉。
+``build_demo``/``process_video`` 需要 gradio、infer extras、模型權重與影片資源；
+這裡聚焦不依賴重型套件的部分：events dict → gr.Dataframe rows 的轉換。
+模組頂層不 import gradio，因此這個 import 本身就是一項回歸測試——只要
+gradio_app.py 不小心在頂層引入重型依賴，這裡就會在輕量 venv 失敗。
 """
 
 from types import SimpleNamespace

@@ -3,7 +3,7 @@
 ## UR Fall Detection Dataset (URFD)
 
 本專案的評估資料來自 Kwolek 與 Kepski 建立的
-[UR Fall Detection Dataset](http://fenix.univ.rzeszow.pl/~mkepski/ds/uf.html)。
+[UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html)。
 資料集及其衍生展示媒體依原作者的 **CC BY-NC-SA 4.0** 條款使用，
 不屬於本 repository 的 MIT License 授權範圍。
 

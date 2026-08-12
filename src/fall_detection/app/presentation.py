@@ -213,7 +213,11 @@ def render_result_html(payload: AnalysisPayload) -> ResultView:
             f'<div><dt>分析影格</dt><dd>{payload.n_frames}</dd></div>'
             f'<div><dt>追蹤人物</dt><dd>{payload.n_tracks}</dd></div>'
             '<div><dt>跌倒事件</dt><dd>0</dd></div>'
-            "</dl></section>"
+            '</dl><section class="fd-no-event-reason"><h3>判定依據</h3>'
+            '<p>未形成符合條件的事件區間；系統未輸出 ALARM。</p></section>'
+            '<ol class="fd-pipeline" aria-label="處理流程">'
+            '<li>POSE</li><li>TRACK</li><li>RULES</li><li>EVENT</li>'
+            '</ol></section>'
         )
         return ResultView(body, False, "NO EVENT")
     events = "".join(

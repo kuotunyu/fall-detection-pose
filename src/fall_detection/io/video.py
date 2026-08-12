@@ -8,8 +8,10 @@ opencv-python 因授權不含 H.264 encoder——因此先寫 mp4v 暫存檔,
 
 from __future__ import annotations
 
+import os
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
@@ -86,7 +88,9 @@ class H264VideoWriter:
 
     def __init__(self, out_path: str | Path, fps: float, width: int, height: int):
         self.out_path = Path(out_path)
-        self._tmp = Path(tempfile.mkstemp(suffix=".mp4")[1])
+        fd, tmp_path = tempfile.mkstemp(suffix=".mp4")
+        os.close(fd)
+        self._tmp = Path(tmp_path)
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         self._writer = cv2.VideoWriter(str(self._tmp), fourcc, fps, (width, height))
         if not self._writer.isOpened():
@@ -100,7 +104,14 @@ class H264VideoWriter:
         try:
             reencode_h264(self._tmp, self.out_path)
         finally:
-            self._tmp.unlink(missing_ok=True)
+            for attempt in range(3):
+                try:
+                    self._tmp.unlink(missing_ok=True)
+                    break
+                except PermissionError:
+                    if attempt == 2:
+                        raise
+                    time.sleep(0.05 * (attempt + 1))
 
     def __enter__(self) -> "H264VideoWriter":
         return self

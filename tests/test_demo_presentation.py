@@ -122,6 +122,9 @@ def test_no_event_result_is_explicit_and_has_no_empty_event_grid():
     assert "未偵測到跌倒事件" in result.html
     assert "分析影格" in result.html and ">150<" in result.html
     assert "fd-event-grid" not in result.html
+    assert "判定依據" in result.html
+    assert "未形成符合條件的事件區間" in result.html
+    assert "POSE" in result.html and "EVENT" in result.html
 
 
 def test_track_lost_path_does_not_claim_alarm_confirmation():

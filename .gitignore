@@ -17,3 +17,6 @@ dist/
 
 # 環境
 .env
+
+# 本機設計腦力激盪與視覺 mockup 工作檔
+.superpowers/

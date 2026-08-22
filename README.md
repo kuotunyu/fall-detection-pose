@@ -1,4 +1,4 @@
-# FallSense：可解釋的姿態跌倒事件偵測
+# fall-detection-pose｜可解釋的姿態跌倒事件偵測
 
 **正體中文** · [English](README.en.md)
 
@@ -9,7 +9,7 @@
 ![Tracker](https://img.shields.io/badge/Tracker-ByteTrack-287D72)
 [![Code license](https://img.shields.io/badge/Code-MIT-3A7D44.svg)](LICENSE)
 
-FallSense 以 **YOLO26-pose** 擷取人體姿態、**ByteTrack** 延續 Track ID，再由可解釋的有限狀態機（UPRIGHT → FALLING → FALLEN → ALARM）判定跌倒事件。每次警示都保留事件時間、Track ID 與 `rules_fired`，讓結果不只回答「有沒有跌倒」，也能說明「為什麼觸發」。
+本專案以 **YOLO26-pose** 擷取人體姿態、**ByteTrack** 延續 Track ID，再由可解釋的有限狀態機（UPRIGHT → FALLING → FALLEN → ALARM）判定跌倒事件。每次警示都保留事件時間、Track ID 與 `rules_fired`，讓結果不只回答「有沒有跌倒」，也能說明「為什麼觸發」。
 
 ## 驗證摘要
 
@@ -115,7 +115,7 @@ uv run pytest -q
 
 ## 系統架構
 
-FallSense 將一次性的 GPU inference 與可重複執行的 CPU decision pipeline 分開；這讓模型推論、規則調整、事件評估與視覺化可以各自驗證，不必每次改閾值都重新跑模型。
+本專案將一次性的 GPU inference 與可重複執行的 CPU decision pipeline 分開；這讓模型推論、規則調整、事件評估與視覺化可以各自驗證，不必每次改閾值都重新跑模型。
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F'}}}%%

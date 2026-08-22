@@ -1,4 +1,4 @@
-# FallSense: Interpretable Pose-Based Fall Event Detection
+# fall-detection-pose | Interpretable Pose-Based Fall Event Detection
 
 [正體中文](README.md) · **English**
 
@@ -9,7 +9,7 @@
 ![Tracker](https://img.shields.io/badge/Tracker-ByteTrack-287D72)
 [![Code license](https://img.shields.io/badge/Code-MIT-3A7D44.svg)](LICENSE)
 
-FallSense extracts human pose keypoints with **YOLO26-pose**, maintains identities with **ByteTrack**, and detects fall events through an interpretable finite-state machine (UPRIGHT → FALLING → FALLEN → ALARM). Every alert preserves its time interval, Track ID, and `rules_fired`, so the output explains not only *whether* a fall was detected, but *why* it fired.
+This project extracts human pose keypoints with **YOLO26-pose**, maintains identities with **ByteTrack**, and detects fall events through an interpretable finite-state machine (UPRIGHT → FALLING → FALLEN → ALARM). Every alert preserves its time interval, Track ID, and `rules_fired`, so the output explains not only *whether* a fall was detected, but *why* it fired.
 
 ## Evaluation summary
 
@@ -117,7 +117,7 @@ uv run pytest -q
 
 ## Architecture
 
-FallSense separates one-time GPU inference from the replayable CPU decision pipeline. Model inference, rule tuning, event evaluation, and visualization can therefore be verified independently without rerunning the model after every threshold change.
+This project separates one-time GPU inference from the replayable CPU decision pipeline. Model inference, rule tuning, event evaluation, and visualization can therefore be verified independently without rerunning the model after every threshold change.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'fontSize': '17px', 'fontFamily': 'Arial, sans-serif', 'lineColor': '#66756F'}}}%%
